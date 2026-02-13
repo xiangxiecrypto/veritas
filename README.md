@@ -187,8 +187,11 @@ RPC_URL=https://mainnet.base.org     # Or Sepolia for testing
 
 ## Documentation
 
-- [SDK Guide](./docs/sdk-guide.md)
-- [API Reference](./docs/api-reference.md)
+- [Product Design](./docs/PRODUCT_DESIGN.md) - Vision, use cases, value propositions
+- [Architecture](./docs/ARCHITECTURE.md) - System design, data flows, security model
+- [Workflow](./docs/WORKFLOW.md) - Developer workflows and common patterns
+- [SDK Guide](./docs/SDK_GUIDE.md) - Installation and quick start
+- [API Reference](./docs/API_REFERENCE.md) - Complete API documentation
 - [ERC-8004 Spec](https://eips.ethereum.org/EIPS/eip-8004)
 
 ## License
