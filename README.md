@@ -98,19 +98,24 @@ Veritas uses **official ERC-8004 contracts** deployed on Base:
 ## Use Case: Moltbook Agent Verification
 
 ```typescript
-// Prove you own the Twitter linked to your Moltbook agent
-const attestation = await veritas.verifyMoltbookTwitter(agentId, 'myhandle');
+// Prove you own a Moltbook agent by verifying the wallet address
+const { attestation, ownerMatch, extractedOwner } = await veritas.verifyMoltbookOwnership(
+  agentId, 
+  'CilohPrimus'  // Your Moltbook agent name
+);
 
 // Result includes:
-// - requestHash (on-chain reference)
-// - taskId (Primus Network task)
-// - data.twitterId (extracted from API response)
-// - proof (full zkTLS proof)
+// - attestation.requestHash (on-chain reference)
+// - attestation.taskId (Primus Network task)
+// - extractedOwner (wallet from Moltbook API)
+// - ownerMatch (true if matches your wallet)
 
 // Anyone can verify:
 const isValid = await veritas.verifyAttestation(attestation.requestHash);
 // { isValid: true, agentId: 123, response: 100 }
 ```
+
+**No Twitter API needed** — verification happens through Moltbook's own API, checking that the agent's registered owner matches the wallet creating the attestation.
 
 ## Deployment
 

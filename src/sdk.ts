@@ -360,26 +360,41 @@ export class VeritasSDK {
   }
 
   // ============================================================
-  // MOLTCOOK HELPERS
+  // MOLTBOOK HELPERS
   // ============================================================
 
-  async verifyMoltbookTwitter(agentId: number, twitterHandle: string): Promise<AttestationResult> {
-    return this.generateAttestation(agentId, {
-      url: `https://api.twitter.com/2/users/by/username/${twitterHandle}`,
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${process.env.TWITTER_BEARER_TOKEN}`
-      },
-      extracts: [{ key: 'twitterId', path: '$.data.id' }]
-    });
-  }
-
-  async verifyMoltbookProfile(agentId: number, moltbookName: string): Promise<AttestationResult> {
-    return this.generateAttestation(agentId, {
+  /**
+   * Verify Moltbook agent ownership via Moltbook API
+   * This proves the agent's registered owner matches the wallet creating the attestation
+   * @param agentId The registered agent ID
+   * @param moltbookName Moltbook agent name (e.g., 'CilohPrimus')
+   */
+  async verifyMoltbookOwnership(agentId: number, moltbookName: string): Promise<{
+    attestation: AttestationResult;
+    ownerMatch: boolean;
+    extractedOwner: string;
+  }> {
+    // Generate attestation from Moltbook API
+    const attestation = await this.generateAttestation(agentId, {
       url: `https://www.moltbook.com/api/v1/agents/${moltbookName}`,
       method: 'GET',
-      extracts: [{ key: 'walletAddress', path: '$.agent.wallet_address' }]
+      extracts: [
+        { key: 'agentName', path: '$.agent.name' },
+        { key: 'ownerAddress', path: '$.agent.wallet_address' },
+        { key: 'moltbookAgentId', path: '$.agent.id' }
+      ]
     });
+
+    // Check if extracted owner matches registered wallet
+    const extractedOwner = (attestation.data.ownerAddress || '').toLowerCase();
+    const registeredOwner = this.walletAddress.toLowerCase();
+    const ownerMatch = extractedOwner === registeredOwner;
+
+    return {
+      attestation,
+      ownerMatch,
+      extractedOwner
+    };
   }
 }
 
