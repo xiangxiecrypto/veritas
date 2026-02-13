@@ -192,6 +192,7 @@ RPC_URL=https://mainnet.base.org     # Or Sepolia for testing
 - [Workflow](./docs/WORKFLOW.md) - Developer workflows and common patterns
 - [SDK Guide](./docs/SDK_GUIDE.md) - Installation and quick start
 - [API Reference](./docs/API_REFERENCE.md) - Complete API documentation
+- [End-to-End Reputation](./docs/END_TO_END_REPUTATION.md) - Building trust through attestations + reputation
 - [ERC-8004 Spec](https://eips.ethereum.org/EIPS/eip-8004)
 
 ## License

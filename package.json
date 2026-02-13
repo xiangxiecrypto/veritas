@@ -8,7 +8,8 @@
     "build": "tsc",
     "test": "jest",
     "example:register": "ts-node examples/full-registration.ts",
-    "example:moltbook": "ts-node examples/moltbook-verification.ts"
+    "example:moltbook": "ts-node examples/moltbook-verification.ts",
+    "example:reputation": "ts-node examples/end-to-end-reputation.ts"
   },
   "dependencies": {
     "@primuslabs/network-core-sdk": "latest",
