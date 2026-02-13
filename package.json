@@ -6,7 +6,7 @@
   "types": "dist/sdk.d.ts",
   "scripts": {
     "build": "tsc",
-    "test": "jest",
+    "test": "cd tests && npx ts-node --project tsconfig.json quick-test.ts",
     "example:register": "ts-node examples/full-registration.ts",
     "example:moltbook": "ts-node examples/moltbook-verification.ts",
     "example:reputation": "ts-node examples/end-to-end-reputation.ts"
