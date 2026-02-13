@@ -41,9 +41,9 @@ const agentId = await veritas.registerAgent({
 
 // Generate decentralized zkTLS attestation
 const attestation = await veritas.generateAttestation(agentId, {
-  url: 'https://api.twitter.com/2/users/by/username/myagent',
+  url: 'https://api.example.com/data',
   method: 'GET',
-  extracts: [{ key: 'twitterId', path: '$.data.id' }]
+  extracts: [{ key: 'value', path: '$.data.value' }]
 });
 ```
 
@@ -171,7 +171,7 @@ function submitPrimusAttestation(
 ├── examples/
 │   ├── full-registration.ts   # Complete walkthrough
 │   ├── moltbook-verification.ts
-│   └── twitter-verification.ts
+│   └── api-verification.ts    # Generic API attestation
 └── package.json
 ```
 

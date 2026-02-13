@@ -73,16 +73,12 @@ async function main() {
   console.log('--- Step 2: Generate zkTLS Attestation ---');
   console.log('Submitting attestation request to Primus Network...');
   
-  // Verify Twitter/X ownership using decentralized attestation
+  // Example: Verify data from any HTTPS API
   const attestation = await veritas.generateAttestation(agentId, {
-    url: 'https://api.twitter.com/2/users/by/username/myverifiedagent',
+    url: 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd',
     method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${process.env.TWITTER_BEARER_TOKEN}`
-    },
     extracts: [
-      { key: 'twitterId', path: '$.data.id' },
-      { key: 'username', path: '$.data.username' }
+      { key: 'btcPrice', path: '$.bitcoin.usd' }
     ]
   });
   
@@ -113,7 +109,7 @@ async function main() {
     value: 95,
     valueDecimals: 0,
     tag1: 'verified',
-    tag2: 'twitter',
+    tag2: 'api-attestation',
     endpoint: 'https://myagent.example.com/',
     feedbackURI: `ipfs://${attestation.requestHash}` // Link to attestation
   });
