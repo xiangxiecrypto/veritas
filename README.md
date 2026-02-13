@@ -181,9 +181,6 @@ function submitPrimusAttestation(
 # Required
 PRIVATE_KEY=0x...                    # Your wallet private key
 
-# Optional (for specific attestations)
-TWITTER_BEARER_TOKEN=...             # For Twitter verification
-
 # Network (defaults to Base Mainnet)
 RPC_URL=https://mainnet.base.org     # Or Sepolia for testing
 ```
