@@ -1,17 +1,17 @@
 {
   "name": "@veritas/protocol",
   "version": "1.0.0",
-  "description": "Trust infrastructure for AI agents using ERC-8004 + Primus zkTLS on Base L2",
+  "description": "ERC-8004 compliant trust infrastructure for AI agents using Primus Network SDK",
   "main": "dist/sdk.js",
   "types": "dist/sdk.d.ts",
   "scripts": {
     "build": "tsc",
     "test": "jest",
-    "example:moltbook": "ts-node examples/moltbook-verification.ts",
-    "example:twitter": "ts-node examples/twitter-verification.ts"
+    "example:register": "ts-node examples/full-registration.ts",
+    "example:moltbook": "ts-node examples/moltbook-verification.ts"
   },
   "dependencies": {
-    "@primuslabs/zktls-core-sdk": "^1.0.0",
+    "@primuslabs/network-core-sdk": "latest",
     "ethers": "^5.7.2"
   },
   "devDependencies": {
@@ -25,8 +25,8 @@
     "Base",
     "AI agents",
     "attestation",
-    "identity",
-    "Moltbook"
+    "Primus Network",
+    "decentralized"
   ],
   "license": "MIT",
   "repository": {

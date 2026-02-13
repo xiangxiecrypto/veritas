@@ -4,7 +4,7 @@
 
 Veritas Protocol provides cryptographic proof of identity and reputation for AI agents using:
 - **ERC-8004** (official Ethereum standard for trustless agents)
-- **Primus zkTLS** (zero-knowledge TLS attestations)
+- **Primus Network SDK** (decentralized zkTLS attestations, wallet-based)
 - **Base L2** (fast, cheap, Ethereum-secured)
 
 ## Quick Start
@@ -15,12 +15,19 @@ npm install @veritas/protocol
 
 ```typescript
 import { VeritasSDK } from '@veritas/protocol';
+import { ethers } from 'ethers';
+
+const provider = new ethers.providers.JsonRpcProvider('https://mainnet.base.org');
+const signer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 
 const veritas = new VeritasSDK({
-  provider,  // Base Mainnet provider
-  signer,    // Your wallet
+  provider,
+  signer, // Required for Primus Network SDK
   network: 'mainnet'
 });
+
+// Initialize (connects to Primus Network)
+await veritas.initialize();
 
 // Register agent on ERC-8004 Identity Registry
 const agentId = await veritas.registerAgent({
@@ -32,76 +39,113 @@ const agentId = await veritas.registerAgent({
   ]
 });
 
-// Generate zkTLS attestation
+// Generate decentralized zkTLS attestation
 const attestation = await veritas.generateAttestation(agentId, {
   url: 'https://api.twitter.com/2/users/by/username/myagent',
   method: 'GET',
-  responsePath: '$.data.id'
+  extracts: [{ key: 'twitterId', path: '$.data.id' }]
 });
 ```
 
+## What's Different from Enterprise SDK?
+
+| Feature | Enterprise SDK | **Network SDK (This)** |
+|---------|---------------|------------------------|
+| **Authentication** | App ID + Secret | **Wallet signatures** |
+| **Decentralization** | Server-based | **Decentralized network** |
+| **Setup** | Needs app credentials | **Just a wallet** |
+| **Verification** | Enterprise verification | **Network consensus** |
+
+**We use Network SDK** for fully decentralized attestations without relying on app credentials.
+
 ## Architecture
 
-Veritas uses the **official ERC-8004 contracts** deployed on Base:
+Veritas uses **official ERC-8004 contracts** deployed on Base:
 
 | Component | Address | Purpose |
 |-----------|---------|---------|
-| **Identity Registry** | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` | ERC-721 based agent registration |
-| **Reputation Registry** | `0x8004BAa17C55a88189AE136b182e5fdA19dE9b63` | On-chain feedback & scoring |
+| **Identity Registry** | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` | ERC-721 agent registration |
+| **Reputation Registry** | `0x8004BAa17C55a88189AE136b182e5fdA19dE9b63` | On-chain feedback |
 | **Validation Registry** | *Deploy your own* | Primus zkTLS attestations |
 
-## Why ERC-8004?
+## Why Primus Network SDK?
 
-Instead of building custom registries, Veritas implements **ERC-8004**, the official Ethereum standard for trustless agents:
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Primus Network                        │
+│  ┌─────────┐    ┌─────────┐    ┌─────────┐             │
+│  │ Attester│────│  ZKTLS  │────│Verifier │             │
+│  │  Node   │    │  Proof  │    │  Node   │             │
+│  └─────────┘    └─────────┘    └─────────┘             │
+│       │                              │                  │
+│       └──────────┬───────────────────┘                  │
+│                  │                                      │
+│           Decentralized Consensus                       │
+└─────────────────────────────────────────────────────────┘
+                         │
+                         ▼
+              ┌──────────────────────┐
+              │   Veritas Smart      │
+              │   Contract (Base)    │
+              └──────────────────────┘
+```
 
-- ✅ **Standardized** - Works with any ERC-8004 compliant tool
-- ✅ **Interoperable** - Agents registered here work with any ERC-8004 dApp
-- ✅ **Proven** - Developed by MetaMask, Coinbase, Google, Ethereum Foundation
-- ✅ **Future-proof** - Part of the official Ethereum standards track
+- **No app credentials** — attestations secured by your wallet
+- **Decentralized verification** — Multiple nodes verify the proof
+- **Cryptographic guarantees** — zkTLS ensures TLS session integrity
+- **On-chain storage** — Proof hash stored on Base L2
 
 ## Use Case: Moltbook Agent Verification
 
-The primary use case is verifying Moltbook agent ownership:
-
 ```typescript
-// Prove you own the Twitter/X linked to your Moltbook agent
+// Prove you own the Twitter linked to your Moltbook agent
 const attestation = await veritas.verifyMoltbookTwitter(agentId, 'myhandle');
 
-// Other agents can verify:
+// Result includes:
+// - requestHash (on-chain reference)
+// - taskId (Primus Network task)
+// - data.twitterId (extracted from API response)
+// - proof (full zkTLS proof)
+
+// Anyone can verify:
 const isValid = await veritas.verifyAttestation(attestation.requestHash);
-// Returns: { isValid: true, agentId: 123, response: 100 }
+// { isValid: true, agentId: 123, response: 100 }
 ```
 
 ## Deployment
 
 ### Base Mainnet (Production)
 ```typescript
-const veritas = new VeritasSDK({ provider, signer, network: 'mainnet' });
-// Uses:
-// - IdentityRegistry: 0x8004A169FB4a3325136EB29fA0ceB6D2e539a432
-// - ReputationRegistry: 0x8004BAa17C55a88189AE136b182e5fdA19dE9b63
+const veritas = new VeritasSDK({
+  provider,
+  signer,
+  network: 'mainnet',
+  chainId: 8453
+});
 ```
 
 ### Base Sepolia (Testnet)
 ```typescript
-const veritas = new VeritasSDK({ provider, signer, network: 'sepolia' });
-// Uses:
-// - IdentityRegistry: 0x8004A818BFB912233c491871b3d84c89A494BD9e
-// - ReputationRegistry: 0x8004B663056A597Dffe9eCcC1965A193B7388713
+const veritas = new VeritasSDK({
+  provider,
+  signer,
+  network: 'sepolia',
+  chainId: 84532
+});
 ```
 
 ## Smart Contracts
 
 ### VeritasValidationRegistry.sol
 
-Extends ERC-8004 Validation Registry with Primus zkTLS support:
+Extends ERC-8004 with Primus Network support:
 
 ```solidity
 // ERC-8004 compliant interface
-function validationRequest(address validator, uint256 agentId, string requestURI, bytes32 requestHash);
-function validationResponse(bytes32 requestHash, uint8 response, string responseURI, bytes32 responseHash, string tag);
+function validationRequest(address validator, uint256 agentId, ...);
+function validationResponse(bytes32 requestHash, uint8 response, ...);
 
-// Veritas-specific: Submit Primus zkTLS proof
+// Veritas-specific: Submit Primus Network attestation
 function submitPrimusAttestation(
     uint256 agentId,
     bytes32 proofHash,
@@ -111,29 +155,39 @@ function submitPrimusAttestation(
 ) returns (bytes32 requestHash);
 ```
 
-## Documentation
-
-- [SDK Guide](./docs/sdk-guide.md) - TypeScript integration
-- [API Reference](./docs/api-reference.md) - Complete API docs
-- [ERC-8004 Spec](https://eips.ethereum.org/EIPS/eip-8004) - Official standard
-
 ## Project Structure
 
 ```
 .
 ├── src/
-│   └── sdk.ts              # TypeScript SDK (ERC-8004 compliant)
+│   └── sdk.ts              # TypeScript SDK (Primus Network)
 ├── contracts/
-│   └── VeritasValidationRegistry.sol  # zkTLS-enabled validation
+│   └── VeritasValidationRegistry.sol
 ├── examples/
 │   ├── full-registration.ts   # Complete walkthrough
 │   ├── moltbook-verification.ts
 │   └── twitter-verification.ts
-├── docs/
-│   ├── sdk-guide.md
-│   └── api-reference.md
 └── package.json
 ```
+
+## Environment Variables
+
+```bash
+# Required
+PRIVATE_KEY=0x...                    # Your wallet private key
+
+# Optional (for specific attestations)
+TWITTER_BEARER_TOKEN=...             # For Twitter verification
+
+# Network (defaults to Base Mainnet)
+RPC_URL=https://mainnet.base.org     # Or Sepolia for testing
+```
+
+## Documentation
+
+- [SDK Guide](./docs/sdk-guide.md)
+- [API Reference](./docs/api-reference.md)
+- [ERC-8004 Spec](https://eips.ethereum.org/EIPS/eip-8004)
 
 ## License
 
