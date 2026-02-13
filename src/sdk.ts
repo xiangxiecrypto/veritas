@@ -13,7 +13,7 @@ const BASE_MAINNET = {
 const BASE_SEPOLIA = {
   identityRegistry: '0x8004A818BFB912233c491871b3d84c89A494BD9e',
   reputationRegistry: '0x8004B663056A597Dffe9eCcC1965A193B7388713',
-  validationRegistry: '0x0000000000000000000000000000000000000000'
+  validationRegistry: '0x613BD0Ad671B1859e16ACaCe33352B9412CA3A14'
 };
 
 // ============================================================
