@@ -1,147 +1,174 @@
 # Veritas 🔱
 
-> **The Truth Layer for AI Agents - ERC-8004 + Primus zkTLS on Base**
+> **The Truth Layer for AI Agents — ERC-8004 + Primus zkTLS on Base**
 
 [![Base](https://img.shields.io/badge/Base-L2-0052FF)](https://base.org)
 [![Primus](https://img.shields.io/badge/zkTLS-Primus-6366F1)](https://primuslabs.xyz)
 [![ERC-8004](https://img.shields.io/badge/Standard-ERC--8004-blue)](https://eips.ethereum.org/EIPS/eip-8004)
+[![License](https://img.shields.io/badge/License-MIT-green)](./LICENSE)
 
 ---
 
-## What is Veritas?
+## 🎯 What is Veritas?
 
-**Veritas** (Latin: *Truth*) is the trust infrastructure for the AI agent economy:
+**Veritas** (Latin: *Truth*) is the trust infrastructure for the AI agent economy. It solves the "trust but verify" problem for autonomous agents operating across platforms.
 
-- **Before:** "Trust me, I executed that trade"  
-- **After:** "Here's cryptographic proof from Primus zkTLS Network"
+### The Problem
+- Users can't verify agent claims
+- No standardized reputation system
+- API calls are unverifiable
+- Cross-platform identity doesn't exist
 
-### Core Features
-
-🔐 **Cryptographic Verification**  
-Every API call generates a zkTLS proof that can be verified on-chain
-
-🆔 **Portable Identity**  
-Agents have ERC-721 NFT identities that travel across platforms
-
-⭐ **Verifiable Reputation**  
-Reputation built on actual proofs, not just claims
-
-🌐 **Cross-Platform**  
-Standardized protocol works with any agent framework
+### The Solution
+- **Cryptographic Proofs:** Every API call generates a zkTLS attestation
+- **Portable Identity:** ERC-721 NFT identities that travel across platforms  
+- **Verifiable Reputation:** Built on actual proofs, not claims
+- **Standardized Protocol:** Works with any agent framework
 
 ---
 
-## Quick Start
+## 🚀 Quick Start
 
 ### For Agent Developers
 
 ```bash
-# Install SDK
-pip install veritas-sdk
+# Install the SDK
+npm install @veritas/sdk
 
 # Register your agent
-from veritas import Agent
+import { VeritasAgent } from '@veritas/sdk';
 
-agent = Agent(
-    name="MyDataBot",
-    primus_app_id="your_app_id",
-    network="base"
-)
+const agent = new VeritasAgent({
+  name: "TradingBot_Alpha",
+  primusAppId: process.env.PRIMUS_APP_ID,
+  network: 'base-mainnet'
+});
 
-# Auto-generate proofs for API calls
-@agent.attest()
-def fetch_data(url):
-    return requests.get(url).json()
+// Attest any API call
+const priceData = await agent.attest(
+  () => fetch('https://api.exchange.com/price/BTC'),
+  { label: 'BTC_price_check' }
+);
+
+// Proof is automatically stored on-chain
+console.log(priceData.proofHash); // 0xabc...
 ```
 
 ### For Consumers
 
 ```javascript
-// Verify agent before hiring
-const agent = await Veritas.getAgent(agentId);
+// Verify any agent before trusting
+import { Veritas } from '@veritas/sdk';
 
-// Check reputation
-console.log(agent.reputation.verifiedTasks); // 148
-console.log(agent.reputation.averageRating); // 4.8
+const agent = await Veritas.getAgent('0xAgentID...');
 
-// Verify specific proof
-const isValid = await agent.verifyProof(proofHash);
+// Check verified history
+console.log(agent.stats.verifiedCalls); // 1,247
+console.log(agent.stats.successRate);   // 98.5%
+
+// Verify a specific claim
+const isValid = await Veritas.verifyProof(
+  '0xProofHash...',
+  agent.identity
+);
 ```
 
 ---
 
-## Architecture
+## 🏗️ Architecture
 
 ```
-Agent SDK → Primus Network → Base L2 (ERC-8004 Contracts)
-     ↑              ↑                    ↑
-   Makes      Generates          Stores & Verifies
-   API Call   zkTLS Proof        On-Chain
+┌─────────────┐     ┌──────────────┐     ┌─────────────┐
+│  Agent SDK  │────▶│ Primus zkTLS │────▶│  Base L2    │
+│  (Client)   │     │  (Attestation)│     │ (Registry)  │
+└─────────────┘     └──────────────┘     └─────────────┘
+       │                                           │
+       │                                           │
+       ▼                                           ▼
+┌─────────────┐                          ┌─────────────┐
+│  HTTPS API  │                          │ ERC-8004    │
+│  (Any API)  │                          │ Contracts   │
+└─────────────┘                          └─────────────┘
 ```
 
-**Three Core Registries:**
-1. **Identity Registry** - Agent NFTs and metadata
-2. **Validation Registry** - zkTLS proof storage
-3. **Reputation Registry** - Scoring and reviews
+### Three Core Registries
+
+1. **Identity Registry** (`0x8004A169...`)
+   - Agent NFTs and metadata
+   - Cross-platform identifier
+   - Immutable agent history
+
+2. **Validation Registry** (Veritas Extension)
+   - zkTLS proof storage
+   - API call attestations
+   - Verification queries
+
+3. **Reputation Registry** (`0x8004BAa1...`)
+   - Scoring and reviews
+   - Historical performance
+   - Community trust metrics
 
 ---
 
-## Use Cases
+## 📚 Documentation
 
-### 🎯 Primary Use Cases
+- [Architecture Deep Dive](./docs/architecture.md)
+- [SDK Guide](./docs/sdk-guide.md) — Getting started with the TypeScript SDK
+- [API Reference](./docs/api-reference.md) — Complete API documentation
+- [Smart Contracts](./docs/contracts.md) — Contract addresses and ABIs
 
-| Use Case | Description |
-|----------|-------------|
-| **Trading Agents** | Prove execution prices, verify PnL |
-| **Data Agents** | Attest data sources, ensure integrity |
-| **Analysis Agents** | Verify research, source credibility |
-| **Orchestrators** | Coordinate multi-agent systems |
+### Use Cases
 
-### 🐦 Optional: Social Verification
-
-Agents can optionally verify X/Twitter ownership using zkTLS:
-
-```python
-# Prove X account ownership
-proof = await agent.verify_x_account("@mybot")
-# Stores attestation: "I control @mybot on X"
-```
-
-**Note:** Social verification is optional, not required for core functionality.
+- [Moltbook Agent Verification](./docs/use-case-moltbook-verification.md) — Prove X/Twitter ownership
+- [Trading Bot Verification](./docs/use-case-trading-verification.md) — Verify execution prices
+- [Data Oracle Verification](./docs/use-case-oracle-verification.md) — Attest data sources
 
 ---
 
-## Documentation
+## 🔧 Smart Contracts
 
-- [Architecture Design](./docs/architecture.md)
-- [SDK Guide](./docs/sdk-guide.md) (Coming soon)
-- [API Reference](./docs/api-reference.md) (Coming soon)
-- [X Verification Use Case](./docs/use-case-x-verification.md)
+### Base Mainnet
+
+| Contract | Address | Purpose |
+|----------|---------|---------|
+| IdentityRegistry | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` | ERC-8004 standard |
+| ReputationRegistry | `0x8004BAa17C55a88189AE136b182e5fdA19dE9b63` | Reputation scoring |
+| ValidationRegistry | *TBD* | zkTLS proof storage |
+
+### Base Sepolia (Testnet)
+
+| Contract | Address | Purpose |
+|----------|---------|---------|
+| IdentityRegistry | `0x8004A818BFB912233c491871b3d84c89A494BD9e` | Test identity |
+| ReputationRegistry | `0x8004B663056A597Dffe9eCcC1965A193B7388713` | Test reputation |
+| ValidationRegistry | *TBD* | Test validation |
 
 ---
 
-## Roadmap
+## 🛣️ Roadmap
 
 - [x] Architecture design
-- [ ] Phase 1: Primus SDK integration
-- [ ] Phase 2: Smart contract deployment
-- [ ] Phase 3: Agent SDK release
-- [ ] Phase 4: Consumer portal launch
+- [x] Documentation framework
+- [ ] ValidationRegistry.sol deployment
+- [ ] TypeScript SDK alpha release
+- [ ] Example integrations
+- [ ] Security audit
+- [ ] Mainnet launch
 
 ---
 
-## Contributing
+## 🤝 Contributing
 
 We welcome contributions! See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
 
 ---
 
-## License
+## 📄 License
 
-MIT License - see [LICENSE](./LICENSE) for details.
+MIT License — see [LICENSE](./LICENSE) for details.
 
 ---
 
 **Built with ❤️ using ERC-8004, Primus zkTLS, and Base L2**
 
-*"In Veritas we trust, with proofs we verify"*
+> *"In Veritas we trust, with proofs we verify"*
