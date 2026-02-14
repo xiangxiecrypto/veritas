@@ -8,9 +8,10 @@ Veritas Protocol enables on-chain verification of zkTLS attestations from Primus
 
 - ✅ Validates real-world data attestations on-chain
 - ✅ Verifies zkTLS proofs from Primus Network
-- ✅ Grants ERC-8004 reputation scores (95/100)
+- ✅ Grants ERC-8004 reputation with **dynamic scoring** (100/98/95)
 - ✅ Gas-optimized pure on-chain verification
 - ✅ Anti-replay protection
+- ✅ Configurable freshness-based scoring
 
 ## 📦 Deployed Contracts (Base Sepolia)
 
@@ -58,7 +59,8 @@ npm run verify
 4. Wallet → Veritas: validateAttestation(taskId, hashes)
 5. Veritas → Primus: queryTask(taskId) [on-chain]
 6. Veritas: Verify recipient, URL, data, freshness
-7. Veritas → Reputation: giveFeedback(95/100)
+7. Veritas: Calculate score (100/98/95 based on age)
+8. Veritas → Reputation: giveFeedback(score)
 ```
 
 ### Pure On-Chain Verification
@@ -123,6 +125,42 @@ Gas: 100,000
 Cost: 0.000000363845 ETH ($0.00098 @ 2700 ETH/USD)
 Tx: https://sepolia.basescan.org/tx/0x8f55e796e1dc3c71b3d35f1afc452679a1a79a946720e8c4b324a1efa68a25cb
 ```
+
+## 🌟 Dynamic Scoring System
+
+Veritas uses **freshness-based scoring** to incentivize quick verification:
+
+| Attestation Age | Score | Description |
+|----------------|-------|-------------|
+| < 10 minutes | **100** | Fresh - just created |
+| < 30 minutes | **98** | Recent - still warm |
+| < 60 minutes | **95** | Normal - valid |
+| > 60 minutes | ❌ | Expired - rejected |
+
+### Configuration (Owner Only)
+
+```javascript
+// Adjust base score
+await veritas.setBaseScore(90, 0);  // Default: 95
+
+// Adjust freshness thresholds
+await veritas.setFreshnessThresholds(
+  5 * 60,   // 100 if < 5min (default: 10min)
+  15 * 60   // 98 if < 15min (default: 30min)
+);
+
+// Check score for specific age
+const score = await veritas.calculateScore(15 * 60);
+console.log(score);  // 98
+```
+
+**Benefits:**
+- ✅ Rewards quick verification (100 vs 95)
+- ✅ Incentivizes fresh attestations
+- ✅ Configurable by owner
+- ✅ Future-proof design
+
+See [Scoring Guide](./veritas-protocol/docs/SCORING_GUIDE.md) for details.
 
 ## 📁 Project Structure
 
