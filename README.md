@@ -126,41 +126,36 @@ Cost: 0.000000363845 ETH ($0.00098 @ 2700 ETH/USD)
 Tx: https://sepolia.basescan.org/tx/0x8f55e796e1dc3c71b3d35f1afc452679a1a79a946720e8c4b324a1efa68a25cb
 ```
 
-## 🌟 Dynamic Scoring System
+## ⚙️ Configurable Reputation Score
 
-Veritas uses **freshness-based scoring** to incentivize quick verification:
+Veritas grants a **configurable reputation score** for valid attestations:
 
-| Attestation Age | Score | Description |
-|----------------|-------|-------------|
-| < 10 minutes | **100** | Fresh - just created |
-| < 30 minutes | **98** | Recent - still warm |
-| < 60 minutes | **95** | Normal - valid |
-| > 60 minutes | ❌ | Expired - rejected |
+- **Default**: 95/100 (integer scale)
+- **Owner can adjust**: Anytime without contract upgrade
 
-### Configuration (Owner Only)
+### Change the Score (Owner Only)
 
 ```javascript
-// Adjust base score
-await veritas.setBaseScore(90, 0);  // Default: 95
+// Set to 100/100
+await veritas.setReputationScore(100, 0);
 
-// Adjust freshness thresholds
-await veritas.setFreshnessThresholds(
-  5 * 60,   // 100 if < 5min (default: 10min)
-  15 * 60   // 98 if < 15min (default: 30min)
-);
+// Set to 90/100
+await veritas.setReputationScore(90, 0);
 
-// Check score for specific age
-const score = await veritas.calculateScore(15 * 60);
-console.log(score);  // 98
+// Use decimals (4.5/5 scale)
+await veritas.setReputationScore(45, 1);  // 45 / 10 = 4.5
+
+// Check current score
+const score = await veritas.reputationScore();
+const decimals = await veritas.scoreDecimals();
+console.log(`Score: ${score} with ${decimals} decimals`);
 ```
 
-**Benefits:**
-- ✅ Rewards quick verification (100 vs 95)
-- ✅ Incentivizes fresh attestations
-- ✅ Configurable by owner
-- ✅ Future-proof design
-
-See [Scoring Guide](./veritas-protocol/docs/SCORING_GUIDE.md) for details.
+**Simple & Flexible:**
+- ✅ One score for all valid attestations
+- ✅ Owner-controlled configuration
+- ✅ Supports different scales (0-100, 0-5, etc.)
+- ✅ No contract upgrade needed to adjust
 
 ## 📁 Project Structure
 

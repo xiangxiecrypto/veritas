@@ -86,17 +86,9 @@ contract VeritasValidationRegistry {
 
     uint256 public constant MAX_AGE = 1 hours;
 
-    // ⭐ Configurable Scoring System
-    int128 public baseScore = 95;           // Default score for valid attestation
-    uint8 public scoreDecimals = 0;         // 0 = integer (0-100 scale)
-
-    // Freshness bonus thresholds (in seconds)
-    uint256 public freshnessBonus1 = 10 minutes;  // 100 score if < 10min
-    uint256 public freshnessBonus2 = 30 minutes;  // 98 score if < 30min
-
-    int128 public constant SCORE_FRESH = 100;     // Very fresh attestation
-    int128 public constant SCORE_RECENT = 98;     // Recent attestation
-    int128 public constant SCORE_BASE = 95;       // Normal attestation
+    // ⭐ Configurable Score
+    int128 public reputationScore = 95;    // Default: 95/100
+    uint8 public scoreDecimals = 0;        // 0 = integer scale
 
     event AttestationValidated(
         uint256 indexed agentId,
@@ -108,19 +100,9 @@ contract VeritasValidationRegistry {
         bool success
     );
 
-    event ReputationGranted(
-        uint256 indexed agentId,
-        int128 score,
-        uint256 age,
-        bytes32 taskId
-    );
+    event ReputationGranted(uint256 indexed agentId, int128 score, bytes32 taskId);
 
-    event ScoreConfigUpdated(
-        int128 baseScore,
-        uint8 decimals,
-        uint256 freshnessBonus1,
-        uint256 freshnessBonus2
-    );
+    event ScoreUpdated(int128 newScore, uint8 decimals);
 
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
@@ -160,44 +142,14 @@ contract VeritasValidationRegistry {
     }
 
     /**
-     * @notice Update base score configuration
-     * @param _baseScore New base score (default 95)
-     * @param _decimals Number of decimals (0 for integer)
+     * @notice Update the reputation score granted for valid attestations
+     * @param _score New score value (e.g., 95, 100)
+     * @param _decimals Number of decimals (0 for integer, 1 for tenths, etc.)
      */
-    function setBaseScore(int128 _baseScore, uint8 _decimals) external onlyOwner {
-        baseScore = _baseScore;
+    function setReputationScore(int128 _score, uint8 _decimals) external onlyOwner {
+        reputationScore = _score;
         scoreDecimals = _decimals;
-        emit ScoreConfigUpdated(baseScore, scoreDecimals, freshnessBonus1, freshnessBonus2);
-    }
-
-    /**
-     * @notice Update freshness bonus thresholds
-     * @param _freshnessBonus1 First threshold (e.g., 10 minutes) for max score
-     * @param _freshnessBonus2 Second threshold (e.g., 30 minutes) for high score
-     */
-    function setFreshnessThresholds(
-        uint256 _freshnessBonus1,
-        uint256 _freshnessBonus2
-    ) external onlyOwner {
-        require(_freshnessBonus1 < _freshnessBonus2, "Invalid thresholds");
-        freshnessBonus1 = _freshnessBonus1;
-        freshnessBonus2 = _freshnessBonus2;
-        emit ScoreConfigUpdated(baseScore, scoreDecimals, freshnessBonus1, freshnessBonus2);
-    }
-
-    /**
-     * @notice Calculate score based on attestation freshness
-     * @param age Age of attestation in seconds
-     * @return score The calculated reputation score
-     */
-    function calculateScore(uint256 age) public view returns (int128 score) {
-        if (age < freshnessBonus1) {
-            return SCORE_FRESH;  // 100 - Very fresh
-        } else if (age < freshnessBonus2) {
-            return SCORE_RECENT; // 98 - Recent
-        } else {
-            return baseScore;    // 95 - Normal (configurable)
-        }
+        emit ScoreUpdated(_score, _decimals);
     }
 
     /**
@@ -236,11 +188,7 @@ contract VeritasValidationRegistry {
 
         // Verify freshness
         uint256 ts = att.timestamp > 1e12 ? att.timestamp / 1000 : att.timestamp;
-        uint256 age = block.timestamp - ts;
-        require(age <= MAX_AGE, "Expired");
-
-        // Calculate score based on freshness
-        int128 score = calculateScore(age);
+        require(block.timestamp - ts <= MAX_AGE, "Expired");
 
         // Emit event
         emit AttestationValidated(
@@ -253,10 +201,10 @@ contract VeritasValidationRegistry {
             true
         );
 
-        // Grant reputation with dynamic score
+        // Grant reputation with configurable score
         reputationRegistry.giveFeedback(
             agentId,
-            score,
+            reputationScore,
             scoreDecimals,
             "primus-zktls",
             att.request[0].url,
@@ -265,7 +213,7 @@ contract VeritasValidationRegistry {
             taskId
         );
 
-        emit ReputationGranted(agentId, score, age, taskId);
+        emit ReputationGranted(agentId, reputationScore, taskId);
 
         return true;
     }
