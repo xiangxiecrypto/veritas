@@ -8,13 +8,15 @@ import { PrimusAttestationVerifier, AttestationVerificationResult, AttestationVe
 const BASE_MAINNET = {
   identityRegistry: '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432',
   reputationRegistry: '0x8004BAa17C55a88189AE136b182e5fdA19dE9b63',
-  validationRegistry: '0x0000000000000000000000000000000000000000' // TBD
+  validationRegistry: '0x0000000000000000000000000000000000000000', // TBD
+  primusVeritasApp: '0x0000000000000000000000000000000000000000' // TBD
 };
 
 const BASE_SEPOLIA = {
   identityRegistry: '0x8004A818BFB912233c491871b3d84c89A494BD9e',
   reputationRegistry: '0x8004B663056A597Dffe9eCcC1965A193B7388713',
-  validationRegistry: '0x439D0B5C814CFD120D4B471051fF609c992F89C9' // V2.1 Contract (timestamp fix)
+  validationRegistry: '0x439D0B5C814CFD120D4B471051fF609c992F89C9', // V2.1 Contract (timestamp fix)
+  primusVeritasApp: '0x0560B5dACDc476A1289F8Db7D4760fe1D079FF8e'
 };
 
 // ============================================================
@@ -31,6 +33,18 @@ const IDENTITY_REGISTRY_ABI = [
   "function getMetadata(uint256 agentId, string memory metadataKey) external view returns (bytes memory)",
   "function setMetadata(uint256 agentId, string metadataKey, bytes metadataValue) external",
   "event Registered(uint256 indexed agentId, string agentURI, address indexed owner)"
+];
+
+// PrimusVeritasApp ABI
+const PRIMUS_VERITAS_APP_ABI = [
+  "function requestVerification(uint256 ruleId, uint256 agentId) external payable returns (bytes32 taskId)",
+  "function rules(uint256) external view returns (bytes32 urlHash, string url, string dataKey, int128 score, uint8 decimals, uint256 maxAge, bool active, string description)",
+  "function ruleCount() external view returns (uint256)",
+  "function identityRegistry() external view returns (address)",
+  "function reputationRegistry() external view returns (address)",
+  "function primusTask() external view returns (address)",
+  "event VerificationRequested(bytes32 indexed taskId, uint256 indexed ruleId, uint256 indexed agentId)",
+  "event VerificationCompleted(bytes32 indexed taskId, uint256 indexed agentId, int128 score)"
 ];
 
 const REPUTATION_REGISTRY_ABI = [
@@ -76,6 +90,7 @@ export interface VeritasConfig {
   signer: ethers.Signer;
   network?: 'mainnet' | 'sepolia';
   validationRegistryAddress?: string;
+  primusVeritasAppAddress?: string;
   chainId?: number;
   rpcUrl?: string;
 }
@@ -142,6 +157,7 @@ export class VeritasSDK {
   identityRegistry: ethers.Contract;
   reputationRegistry: ethers.Contract;
   validationRegistry: ethers.Contract;
+  primusVeritasApp: ethers.Contract;
   
   // Primus Network
   private primusNetwork: any;
@@ -159,6 +175,7 @@ export class VeritasSDK {
     
     // Use provided address or default
     const validationRegistryAddress = config.validationRegistryAddress || addresses.validationRegistry;
+    const primusVeritasAppAddress = config.primusVeritasAppAddress || addresses.primusVeritasApp;
     
     this.identityRegistry = new ethers.Contract(
       addresses.identityRegistry,
@@ -175,6 +192,12 @@ export class VeritasSDK {
     this.validationRegistry = new ethers.Contract(
       validationRegistryAddress,
       VALIDATION_REGISTRY_V2_ABI,
+      this.signer
+    );
+    
+    this.primusVeritasApp = new ethers.Contract(
+      primusVeritasAppAddress,
+      PRIMUS_VERITAS_APP_ABI,
       this.signer
     );
   }
@@ -201,6 +224,11 @@ export class VeritasSDK {
   // IDENTITY REGISTRY (ERC-8004)
   // ============================================================
   
+  /**
+   * Register a new agent identity (Step 1 of Veritas flow)
+   * @param agent Agent registration data
+   * @returns The agent ID
+   */
   async registerAgent(agent: AgentRegistration): Promise<number> {
     const agentURI = `data:application/json;base64,${Buffer.from(JSON.stringify({
       type: "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
@@ -224,6 +252,20 @@ export class VeritasSDK {
     return agentId;
   }
   
+  /**
+   * Simple identity registration - just name and description
+   * @param name Agent name
+   * @param description Agent description
+   * @returns The agent ID
+   */
+  async registerIdentity(name: string, description: string): Promise<number> {
+    return this.registerAgent({
+      name,
+      description,
+      services: []
+    });
+  }
+  
   async getAgentOwner(agentId: number): Promise<string> {
     return this.identityRegistry.ownerOf(agentId);
   }
@@ -232,6 +274,105 @@ export class VeritasSDK {
     const owner = await this.getAgentOwner(agentId);
     const checkAddress = address || this.walletAddress;
     return owner.toLowerCase() === checkAddress.toLowerCase();
+  }
+  
+  async isAgentRegistered(agentId: number): Promise<boolean> {
+    try {
+      await this.identityRegistry.ownerOf(agentId);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  
+  // ============================================================
+  // PRIMUS VERITAS APP - Build Reputation (Step 2)
+  // ============================================================
+  
+  /**
+   * Request verification to build reputation (Step 2 of Veritas flow)
+   * Caller must be the agent owner
+   * @param agentId The agent ID (must be owned by caller)
+   * @param ruleId The verification rule (0 = BTC price, 1 = ETH price)
+   * @returns Task ID for tracking
+   */
+  async requestVerification(agentId: number, ruleId: number = 0): Promise<string> {
+    // Verify caller owns the agent
+    const isOwner = await this.isAgentOwner(agentId);
+    if (!isOwner) {
+      throw new Error(`Caller is not the owner of agent ${agentId}`);
+    }
+    
+    const tx = await this.primusVeritasApp.requestVerification(ruleId, agentId, {
+      value: ethers.utils.parseEther('0.001') // Fee for Primus
+    });
+    const receipt = await tx.wait();
+    
+    // Parse taskId from event
+    const event = receipt.events?.find((e: any) => e.event === 'VerificationRequested');
+    const taskId = event?.args?.taskId;
+    
+    console.log(`✅ Verification requested for agent ${agentId}`);
+    console.log(`   Task ID: ${taskId}`);
+    return taskId;
+  }
+  
+  /**
+   * Get available verification rules
+   */
+  async getVerificationRules(): Promise<Array<{
+    id: number;
+    url: string;
+    dataKey: string;
+    score: number;
+    maxAge: number;
+    active: boolean;
+    description: string;
+  }>> {
+    const count = (await this.primusVeritasApp.ruleCount()).toNumber();
+    const rules = [];
+    
+    for (let i = 0; i < count; i++) {
+      const rule = await this.primusVeritasApp.rules(i);
+      rules.push({
+        id: i,
+        url: rule.url,
+        dataKey: rule.dataKey,
+        score: rule.score.toNumber(),
+        maxAge: rule.maxAge.toNumber(),
+        active: rule.active,
+        description: rule.description
+      });
+    }
+    
+    return rules;
+  }
+  
+  // ============================================================
+  // COMPLETE VERITAS FLOW
+  // ============================================================
+  
+  /**
+   * Complete Veritas flow: Register agent → Request verification
+   * @param name Agent name
+   * @param description Agent description
+   * @param ruleId Verification rule (default: 0 = BTC price)
+   * @returns Agent ID and Task ID
+   */
+  async registerAndVerify(
+    name: string, 
+    description: string, 
+    ruleId: number = 0
+  ): Promise<{ agentId: number; taskId: string }> {
+    // Step 1: Register agent
+    console.log('📋 Step 1: Registering agent...');
+    const agentId = await this.registerIdentity(name, description);
+    
+    // Step 2: Request verification
+    console.log('\n📋 Step 2: Requesting verification...');
+    const taskId = await this.requestVerification(agentId, ruleId);
+    
+    return { agentId, taskId };
   }
   
   // ============================================================
