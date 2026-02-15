@@ -96,8 +96,8 @@ npx hardhat compile
 # Deploy to Base Sepolia
 npx hardhat run scripts/deploy-veritas-v2.js --network baseSepolia
 
-# Check identity registry
-node scripts/check-identity-registry.js
+# Test verification
+node scripts/test-step2.js
 ```
 
 ## 📁 Project Structure
