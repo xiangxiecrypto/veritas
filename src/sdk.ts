@@ -16,7 +16,7 @@ const BASE_SEPOLIA = {
   identityRegistry: '0x8004A818BFB912233c491871b3d84c89A494BD9e',
   reputationRegistry: '0x8004B663056A597Dffe9eCcC1965A193B7388713',
   validationRegistry: '0x439D0B5C814CFD120D4B471051fF609c992F89C9', // V2.1 Contract (timestamp fix)
-  primusVeritasApp: '0x0560B5dACDc476A1289F8Db7D4760fe1D079FF8e'
+  primusVeritasApp: '0xa70063A1970c9c10d0663610Fe7a02495548ba9b'
 };
 
 // ============================================================

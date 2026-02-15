@@ -66,7 +66,7 @@ const taskId = await sdk.requestVerification(agentId, 0);
 | Contract | Address |
 |----------|---------|
 | IdentityRegistry | `0x8004A818BFB912233c491871b3d84c89A494BD9e` |
-| PrimusVeritasApp | `0x0560B5dACDc476A1289F8Db7D4760fe1D079FF8e` |
+| PrimusVeritasApp | `0xa70063A1970c9c10d0663610Fe7a02495548ba9b` |
 
 ## Links
 

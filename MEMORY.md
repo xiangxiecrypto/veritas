@@ -34,8 +34,8 @@ Veritas is a trust infrastructure that combines ERC-8004 agent identity with Pri
 | Contract | Address | Purpose |
 |----------|---------|---------|
 | **IdentityRegistry** | `0x8004A818BFB912233c491871b3d84c89A494BD9e` | Register agent identities (Step 1) |
-| **PrimusVeritasApp** | `0x0560B5dACDc476A1289F8Db7D4760fe1D079FF8e` | Build reputation via attestation (Step 2) |
-| **VeritasValidationRegistry** | `0x44A607d073c63f975101e271fEe52EDFF78D715d` | Validate attestations |
+| **PrimusVeritasApp** | `0xa70063A1970c9c10d0663610Fe7a02495548ba9b` | Build reputation via attestation (Step 2) |
+| **VeritasValidationRegistry** | `0x0531Cf433aBc7fA52bdD03B7214d522DAB7Db948` | Validate attestations |
 | **ReputationRegistry** | `0x8004B663056A597Dffe9eCcC1965A193B7388713` | Store reputation scores |
 | **Primus TaskContract** | `0xC02234058caEaA9416506eABf6Ef3122fCA939E8` | Primus zkTLS infrastructure |
 
