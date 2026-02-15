@@ -10,7 +10,7 @@ struct AttNetworkRequest {
 }
 
 struct AttNetworkOneUrlResponseResolve {
-    // Simplified
+    string placeholder; // Placeholder for empty struct
 }
 
 struct Attestation {
@@ -188,7 +188,7 @@ contract VeritasApp {
     function requestVerification(
         uint256 ruleId,
         uint256 agentId
-    ) external returns (bytes32 taskId) {
+    ) external payable returns (bytes32 taskId) {
         VerificationRule memory rule = rules[ruleId];
         require(rule.active, "Rule inactive");
         

@@ -1,4 +1,5 @@
-import { ethers } from "hardhat";
+const hardhat = require("hardhat");
+const { ethers } = hardhat;
 
 async function main() {
   const [deployer] = await ethers.getSigners();

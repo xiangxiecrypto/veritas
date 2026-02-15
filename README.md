@@ -1,208 +1,143 @@
-# Veritas Protocol 🔱
+# Veritas Protocol - Primus zkTLS Integration
 
-**ERC-8004 Compliant Trust Infrastructure for AI Agents**
+Trustless on-chain verification of web data using Primus zkTLS attestations.
 
-Veritas Protocol enables on-chain verification of zkTLS attestations from Primus, creating verifiable reputation for AI agents.
+## 📋 Deployed Contracts (Base Sepolia)
 
-## 🎯 What It Does
+| Contract | Address |
+|----------|---------|
+| **PrimusVeritasApp** | [`0x0560B5dACDc476A1289F8Db7D4760fe1D079FF8e`](https://sepolia.basescan.org/address/0x0560B5dACDc476A1289F8Db7D4760fe1D079FF8e) |
+| **VeritasValidationRegistry** | [`0x44A607d073c63f975101e271fEe52EDFF78D715d`](https://sepolia.basescan.org/address/0x44A607d073c63f975101e271fEe52EDFF78D715d) |
+| **Primus TaskContract** | [`0xC02234058caEaA9416506eABf6Ef3122fCA939E8`](https://sepolia.basescan.org/address/0xC02234058caEaA9416506eABf6Ef3122fCA939E8) |
+| **Reputation Registry** | [`0x8004B663056A597Dffe9eCcC1965A193B7388713`](https://sepolia.basescan.org/address/0x8004B663056A597Dffe9eCcC1965A193B7388713) |
 
-- ✅ Validates real-world data attestations on-chain
-- ✅ Verifies zkTLS proofs from Primus Network
-- ✅ Grants ERC-8004 reputation with **dynamic scoring** (100/98/95)
-- ✅ Gas-optimized pure on-chain verification
-- ✅ Anti-replay protection
-- ✅ Configurable freshness-based scoring
+## 🏗️ Architecture
 
-## 📦 Deployed Contracts (Base Sepolia)
-
-| Contract | Address | Purpose |
-|----------|---------|---------|
-| **VeritasValidationRegistry** | [`0x33327EE8e1C100c773632626eB45F14eEcf37fed`](https://sepolia.basescan.org/address/0x33327EE8e1C100c773632626eB45F14eEcf37fed) | Main validator |
-| IdentityRegistry | [`0x8004A818BFB912233c491871b3d84c89A494BD9e`](https://sepolia.basescan.org/address/0x8004A818BFB912233c491871b3d84c89A494BD9e) | ERC-8004 identity |
-| ReputationRegistry | [`0x8004B663056A597Dffe9eCcC1965A193B7388713`](https://sepolia.basescan.org/address/0x8004B663056A597Dffe9eCcC1965A193B7388713) | ERC-8004 reputation |
-| Primus TaskContract | [`0xC02234058caEaA9416506eABf6Ef3122fCA939E8`](https://sepolia.basescan.org/address/0xC02234058caEaA9416506eABf6Ef3122fCA939E8) | zkTLS storage |
+```
+┌─────────┐     requestVerification()     ┌──────────────────┐
+│         │ ──────────────────────────────▶                  │
+│   USER  │                                │ PrimusVeritasApp │
+│         │ ◀──────────────────────────────│                  │
+└─────────┘     taskId returned            └────────┬─────────┘
+                                                    │
+                         submitTask(callback=this)  │
+                                                    ▼
+                                          ┌──────────────────┐
+                                          │ Primus TaskContract│
+                                          │                    │
+                                          │ 1. Create task     │
+                                          │ 2. zkTLS attests   │
+                                          │ 3. Call callback   │
+                                          └────────┬─────────┘
+                                                   │
+                         onAttestationComplete()   │
+                                                   ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                       PrimusVeritasApp                               │
+│                                                                      │
+│  • Verify caller is Primus                                          │
+│  • Extract attestation data                                          │
+│  • Call Registry.validateAttestation()                               │
+└──────────────────────────────────────────────────────────────────────┘
+                                                   │
+                                                   ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                   VeritasValidationRegistry                          │
+│                                                                      │
+│  Validation Checks:                                                  │
+│  1. ✅ Anti-Replay (taskId not used)                                │
+│  2. ✅ URL Match (hash comparison)                                  │
+│  3. ✅ Data Key (exists in attestation)                             │
+│  4. ✅ Recipient (matches tx.origin)                                │
+│  5. ✅ Freshness (not expired)                                      │
+│  6. ✅ Custom Check (app callback)                                  │
+│  7. ✅ Grant Reputation                                              │
+└──────────────────────────────────────────────────────────────────────┘
+                                                   │
+                                                   ▼
+                                          ┌──────────────────┐
+                                          │ Reputation System│
+                                          │   (ERC-8004)     │
+                                          └──────────────────┘
+```
 
 ## 🚀 Quick Start
 
-### 1. Install
-
-```bash
-cd veritas-protocol
-npm install
-```
-
-### 2. Configure
-
-```bash
-cp .env.example .env
-# Edit .env with your PRIVATE_KEY
-```
-
-### 3. Deploy
-
-```bash
-npm run deploy:sepolia
-```
-
-### 4. Verify
-
-```bash
-npm run verify
-```
-
-## 🔬 How It Works
-
-```
-1. Wallet → Primus: Submit task
-2. Primus → zkTLS: Generate attestation
-3. Primus → On-chain: Store attestation (taskId)
-4. Wallet → Veritas: validateAttestation(taskId, hashes)
-5. Veritas → Primus: queryTask(taskId) [on-chain]
-6. Veritas: Verify recipient, URL, data, freshness
-7. Veritas: Calculate score (100/98/95 based on age)
-8. Veritas → Reputation: giveFeedback(score)
-```
-
-### Pure On-Chain Verification
-
-The contract fetches attestation data directly from Primus TaskContract:
-
-```solidity
-function validateAttestation(
-    uint256 agentId,
-    bytes32 taskId,
-    bytes32 expectedUrlHash,
-    bytes32 expectedDataHash
-) external returns (bool) {
-    // Fetch from Primus (on-chain)
-    TaskInfo memory taskInfo = primusTaskContract.queryTask(taskId);
-
-    // Verify
-    require(att.recipient == msg.sender);
-    require(keccak256(bytes(att.request[0].url)) == expectedUrlHash);
-    require(keccak256(bytes(att.data)) == expectedDataHash);
-    require(block.timestamp - att.timestamp <= 1 hours);
-
-    // Grant reputation
-    reputationRegistry.giveFeedback(agentId, 95, ...);
-}
-```
-
-## 📊 Example: BTC Price Verification
+### Request Verification
 
 ```javascript
-// 1. Generate Primus attestation (off-chain)
-const attestation = await primusSdk.createAttestation(
-  "https://api.coinbase.com/v2/exchange-rates?currency=BTC"
+const app = new ethers.Contract(APP_ADDRESS, ABI, wallet);
+
+// One function call - everything else is automatic!
+const tx = await app.requestVerification(
+    0,      // ruleId (0 = BTC/USD, 1 = ETH/USD)
+    12345,  // agentId (who gets reputation)
+    { value: ethers.utils.parseEther("0.00000001") }
 );
 
-// 2. Submit to Veritas
-const tx = await veritas.validateAttestation(
-  1, // agentId
-  attestation.taskId,
-  ethers.utils.id(url),
-  ethers.utils.id(responseData)
-);
-
-// Result:
-// ✅ Recipient: 0x89BBf3451643eef216c3A60d5B561c58F0D8adb9
-// ✅ URL: https://api.coinbase.com/v2/exchange-rates?currency=BTC
-// ✅ Data: {"btcPrice":"68942.56"}
-// 🌟 Reputation: 95/100
-// Gas: ~100K (validation only)
+const receipt = await tx.wait();
+// taskId is returned - Primus will call back automatically
 ```
 
-## 🧪 Test Results
-
-```
-✅ AttestationValidated
-   Recipient: 0x89BBf3451643eef216c3A60d5B561c58F0D8adb9
-   URL: https://api.coinbase.com/v2/exchange-rates?currency=BTC
-   Success: true
-   🌟 Reputation: 95/100
-
-Gas: 100,000
-Cost: 0.000000363845 ETH ($0.00098 @ 2700 ETH/USD)
-Tx: https://sepolia.basescan.org/tx/0x8f55e796e1dc3c71b3d35f1afc452679a1a79a946720e8c4b324a1efa68a25cb
-```
-
-## ⚙️ Configurable Reputation Score
-
-Veritas grants a **configurable reputation score** for valid attestations:
-
-- **Default**: 95/100 (integer scale)
-- **Owner can adjust**: Anytime without contract upgrade
-
-### Change the Score (Owner Only)
+### Add New Rule
 
 ```javascript
-// Set to 100/100
-await veritas.setReputationScore(100, 0);
-
-// Set to 90/100
-await veritas.setReputationScore(90, 0);
-
-// Use decimals (4.5/5 scale)
-await veritas.setReputationScore(45, 1);  // 45 / 10 = 4.5
-
-// Check current score
-const score = await veritas.reputationScore();
-const decimals = await veritas.scoreDecimals();
-console.log(`Score: ${score} with ${decimals} decimals`);
+await app.addRule(
+    "https://api.example.com/data",  // URL to verify
+    "data.value",                     // JSON key to check
+    100,                              // reputation score
+    0,                                // decimals
+    3600,                             // maxAge (seconds)
+    "Example Rule"                    // description
+);
 ```
 
-**Simple & Flexible:**
-- ✅ One score for all valid attestations
-- ✅ Owner-controlled configuration
-- ✅ Supports different scales (0-100, 0-5, etc.)
-- ✅ No contract upgrade needed to adjust
+## 📁 Contract Files
 
-## 📁 Project Structure
+| File | Description |
+|------|-------------|
+| `PrimusVeritasApp.sol` | Main app with callback pattern |
+| `VeritasValidationRegistry.sol` | Pure validation logic |
+| `PrimusTaskInterface.sol` | Official Primus interface |
+| `IVeritasApp.sol` | App interface for callback |
 
-```
-veritas-protocol/
-├── contracts/
-│   └── VeritasValidationRegistry.sol  # Production validator
-├── scripts/
-│   ├── deploy-veritas.js              # Deploy to Base Sepolia
-│   ├── verify-deployment.js           # Verify configuration
-│   └── test-veritas.js                # Test attestation validation
-├── package.json
-├── hardhat.config.js
-├── .env.example
-└── README.md
+## 🔧 Deployment
+
+```bash
+# Compile
+npx hardhat compile
+
+# Deploy to Base Sepolia
+npx hardhat run scripts/deploy-veritas-new-arch.js --network baseSepolia
 ```
 
-## 🔐 Security Features
+## 📊 Current Rules
 
-- **Immutable Dependencies**: All external contracts are immutable
-- **Anti-Replay**: Each taskId validated once
-- **Owner Verification**: Only agent owners can submit
-- **Hash Verification**: Prevents data tampering
-- **Freshness Check**: 1-hour max age
+| ID | URL | Data Key | Score | Max Age |
+|----|-----|----------|-------|---------|
+| 0 | Coinbase BTC/USD | data.rates.USD | 100 | 1 hour |
+| 1 | Coinbase ETH/USD | data.rates.USD | 95 | 2 hours |
 
-## 🗺️ Roadmap
+## 🔗 Links
 
-- [ ] Deploy to Base Mainnet
-- [ ] Build SDK for easy integration
-- [ ] Create reputation explorer UI
-- [ ] Add multi-proof aggregation
-- [ ] Support additional data sources
+- **Primus Network**: https://primus.xyz
+- **Base Sepolia Explorer**: https://sepolia.basescan.org
+- **ERC-8004**: https://eips.ethereum.org/EIPS/eip-8004
 
-## 📖 Documentation
+## 📝 Key Features
 
-- [Veritas Protocol README](./veritas-protocol/README.md) - Full documentation
-- [Primus zkTLS](https://primus.zktls.com) - zkTLS infrastructure
-- [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004) - Agent identity standard
+1. **Callback Pattern**: Primus automatically calls back when attestation is ready
+2. **No User Action Needed**: User only calls `requestVerification()` once
+3. **Pure Validation**: Registry has no dependencies, just validates data
+4. **Gas Optimized**: Uses URL hash for efficient comparison
 
-## 🤝 Contributing
+## 🔐 Security
 
-PRs welcome! See [Primus DevRel Campaign](./primus-devrel-campaign.md) for opportunities.
+- Only Primus TaskContract can call the callback function
+- Anti-replay protection via taskId tracking
+- Recipient must match tx.origin
+- Attestation must be fresh (within maxAge)
 
-## 📄 License
+## 📜 License
 
 MIT
-
----
-
-Built with ❤️ by the Primus community

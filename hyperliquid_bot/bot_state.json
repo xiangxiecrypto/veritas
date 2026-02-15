@@ -1,0 +1,74 @@
+{
+  "status": "Running",
+  "mode": "aggressive",
+  "paper_trading": true,
+  "last_update": "2026-02-15T03:07:20.295695",
+  "wallet": "0x89BBf3451643eef216c3A60d5B561c58F0D8adb9",
+  "positions": [
+    {
+      "coin": "ETH",
+      "side": "LONG",
+      "entry_price": 1920.23,
+      "current_price": 2059.35,
+      "size": 0.003908,
+      "notional": 7.5,
+      "leverage": 10,
+      "unrealized_pnl": 5.44,
+      "pnl_pct": 72.45,
+      "num_trades": 1
+    },
+    {
+      "coin": "BNB",
+      "side": "LONG",
+      "entry_price": 605.49,
+      "current_price": 631.06,
+      "size": 0.012357,
+      "notional": 7.48,
+      "leverage": 10,
+      "unrealized_pnl": 3.16,
+      "pnl_pct": 42.23,
+      "num_trades": 1
+    },
+    {
+      "coin": "SOL",
+      "side": "LONG",
+      "entry_price": 77.86,
+      "current_price": 88.06,
+      "size": 0.095047,
+      "notional": 7.4,
+      "leverage": 10,
+      "unrealized_pnl": 9.7,
+      "pnl_pct": 131.07,
+      "num_trades": 1
+    },
+    {
+      "coin": "BTC",
+      "side": "LONG",
+      "entry_price": 65575.58,
+      "current_price": 69510.5,
+      "size": 0.000114,
+      "notional": 7.48,
+      "leverage": 10,
+      "unrealized_pnl": 4.49,
+      "pnl_pct": 60.01,
+      "num_trades": 1
+    }
+  ],
+  "positions_count": 4,
+  "total_trades": 58,
+  "daily_trades": 0,
+  "total_unrealized_pnl": 22.78,
+  "total_realized_pnl": -60.13,
+  "total_pnl": -37.35,
+  "risk_params": {
+    "max_position_pct": 0.1,
+    "max_leverage": 10,
+    "stop_loss_pct": 0.2,
+    "take_profit_pct": 0.2,
+    "daily_loss_limit": 0.05,
+    "min_confidence": 0.5,
+    "max_trades_per_day": 20,
+    "sentiment_threshold": 0.05,
+    "sentiment_delta_threshold": 0.1
+  }
+}

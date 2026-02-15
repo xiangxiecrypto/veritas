@@ -10,7 +10,7 @@ struct AttNetworkRequest {
 }
 
 struct AttNetworkOneUrlResponseResolve {
-    // Simplified
+    string placeholder; // Placeholder for empty struct
 }
 
 struct Attestation {

@@ -1,0 +1,22 @@
+{
+  "BTC": {
+    "score": 0,
+    "timestamp": 1771124814.74745,
+    "direction": "neutral"
+  },
+  "ETH": {
+    "score": 0,
+    "timestamp": 1771124823.010515,
+    "direction": "neutral"
+  },
+  "SOL": {
+    "score": 0,
+    "timestamp": 1771124831.415834,
+    "direction": "neutral"
+  },
+  "BNB": {
+    "score": 0,
+    "timestamp": 1771124839.780526,
+    "direction": "neutral"
+  }
+}

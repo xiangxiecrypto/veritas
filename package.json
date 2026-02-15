@@ -13,10 +13,13 @@
   },
   "dependencies": {
     "@primuslabs/network-core-sdk": "latest",
-    "ethers": "^5.7.2"
+    "dotenv": "^17.3.1"
   },
   "devDependencies": {
+    "@nomiclabs/hardhat-ethers": "^2.2.3",
     "@types/node": "^20.0.0",
+    "ethers": "^5.8.0",
+    "hardhat": "^2.28.6",
     "ts-node": "^10.9.0",
     "typescript": "^5.0.0"
   },
