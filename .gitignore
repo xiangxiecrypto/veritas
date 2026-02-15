@@ -46,3 +46,4 @@ _archive/
 # Test scripts (development only)
 tests/
 test-*.js
+dist/
