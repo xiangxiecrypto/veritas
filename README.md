@@ -4,12 +4,14 @@
 
 Veritas combines ERC-8004 agent identity with Primus zkTLS attestations to create verifiable, on-chain reputation for AI agents.
 
-## 🎯 Why Veritas?
+## 📚 Documentation
 
-AI agents need trust. Veritas provides:
-- **Identity**: Permanent on-chain agent registration (ERC-8004)
-- **Reputation**: Verifiable attestations from real-world data
-- **Security**: Only registered agents can build reputation
+| Document | Description |
+|----------|-------------|
+| [Design](docs/DESIGN.md) | Product design, use cases, security model |
+| [Architecture](docs/ARCHITECTURE.md) | System architecture, contracts, data flow |
+| [Workflow](docs/WORKFLOW.md) | Step-by-step guide, common patterns |
+| [SDK Reference](docs/SDK.md) | API documentation, methods, errors |
 
 ## 📋 Two-Step Flow
 
@@ -32,7 +34,7 @@ Agent Owner → PrimusVeritasApp.requestVerification(agentId)
 ### Install
 
 ```bash
-npm install ethers @primuslabs/network-core-sdk
+npm install ethers
 ```
 
 ### Register & Verify
@@ -45,14 +47,15 @@ const provider = new ethers.providers.JsonRpcProvider('https://sepolia.base.org'
 const signer = new ethers.Wallet(PRIVATE_KEY, provider);
 const sdk = new VeritasSDK({ provider, signer, network: 'sepolia' });
 
-// STEP 1: Register agent identity
+// Complete flow in one call
+const { agentId, taskId } = await sdk.registerAndVerify("My Agent", "AI assistant");
+
+// Or step by step:
+// Step 1: Register
 const agentId = await sdk.registerIdentity("My Agent", "AI assistant");
 
-// STEP 2: Build reputation via attestation
-const taskId = await sdk.requestVerification(agentId, 0); // Rule 0 = BTC price
-
-// Or do both:
-const { agentId, taskId } = await sdk.registerAndVerify("My Agent", "AI assistant");
+// Step 2: Build reputation
+const taskId = await sdk.requestVerification(agentId, 0);
 ```
 
 ## 📋 Deployed Contracts (Base Sepolia)
@@ -63,29 +66,6 @@ const { agentId, taskId } = await sdk.registerAndVerify("My Agent", "AI assistan
 | **PrimusVeritasApp** | [`0xa70063A1970c9c10d0663610Fe7a02495548ba9b`](https://sepolia.basescan.org/address/0xa70063A1970c9c10d0663610Fe7a02495548ba9b) | Step 2: Build reputation |
 | **VeritasValidationRegistry** | [`0x0531Cf433aBc7fA52bdD03B7214d522DAB7Db948`](https://sepolia.basescan.org/address/0x0531Cf433aBc7fA52bdD03B7214d522DAB7Db948) | Validate attestations |
 | **ReputationRegistry** | [`0x8004B663056A597Dffe9eCcC1965A193B7388713`](https://sepolia.basescan.org/address/0x8004B663056A597Dffe9eCcC1965A193B7388713) | Store reputation |
-| **Primus TaskContract** | [`0xC02234058caEaA9416506eABf6Ef3122fCA939E8`](https://sepolia.basescan.org/address/0xC02234058caEaA9416506eABf6Ef3122fCA939E8) | zkTLS infrastructure |
-
-## 🏗️ Architecture
-
-```
-┌──────────────────┐     ┌─────────────────────┐     ┌──────────────────┐
-│  IdentityRegistry│     │  PrimusVeritasApp   │     │ ReputationRegistry│
-│    (ERC-8004)    │     │                     │     │    (ERC-8004)    │
-├──────────────────┤     ├─────────────────────┤     ├──────────────────┤
-│ register()       │────→│ requestVerification │────→│ giveFeedback()   │
-│ ownerOf()        │     │ onAttestationComplete│     │ getSummary()     │
-└──────────────────┘     └─────────────────────┘     └──────────────────┘
-         ↑                         ↑                         ↑
-         │                         │                         │
-    Step 1: Identity         Step 2: Attestation       Result: Reputation
-```
-
-## 📊 Verification Rules
-
-| ID | URL | Score | What it proves |
-|----|-----|-------|----------------|
-| 0 | Coinbase BTC/USD | 100 | Agent can fetch live BTC price |
-| 1 | Coinbase ETH/USD | 95 | Agent can fetch live ETH price |
 
 ## 🔧 Development
 
@@ -108,19 +88,6 @@ node scripts/test-step2.js
 | `contracts/VeritasValidationRegistry.sol` | Pure validation logic |
 | `contracts/PrimusTaskInterface.sol` | Primus zkTLS interface |
 | `src/sdk.ts` | TypeScript SDK |
-
-## 🔐 Security
-
-```solidity
-// Only registered agents can build reputation
-address agentOwner = identityRegistry.ownerOf(agentId);
-require(msg.sender == agentOwner, "Not agent owner");
-```
-
-- Agent must be registered (Step 1) before building reputation (Step 2)
-- Only the agent owner can request verification
-- Attestations are cryptographically verified via zkTLS
-- Anti-replay protection via taskId tracking
 
 ## 🔗 Links
 
