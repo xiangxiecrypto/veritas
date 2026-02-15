@@ -1,12 +1,18 @@
 const hre = require("hardhat");
 
 /**
- * Deploy NEW Veritas Architecture: ValidationRegistry + PrimusVeritasApp
+ * Deploy Veritas V2: With IdentityRegistry Integration
+ * 
+ * Flow:
+ * 1. Agent registers in IdentityRegistry (ERC-8004) → gets agentId
+ * 2. Agent calls PrimusVeritasApp.requestVerification(agentId) → builds reputation
+ * 
+ * Only registered agents can build reputation.
  */
 
 async function main() {
   console.log("=".repeat(80));
-  console.log("🚀 DEPLOYING NEW VERITAS ARCHITECTURE TO BASE SEPOLIA");
+  console.log("🚀 DEPLOYING VERITAS V2 - IDENTITY REGISTRY INTEGRATION");
   console.log("=".repeat(80) + "\n");
 
   const signers = await hre.ethers.getSigners();
@@ -20,12 +26,15 @@ async function main() {
   console.log(`👤 Deployer: ${deployer.address}`);
   console.log(`💰 Balance: ${hre.ethers.utils.formatEther(await deployer.getBalance())} ETH\n`);
 
+  // Contract addresses
   const PRIMUS_TASK = "0xC02234058caEaA9416506eABf6Ef3122fCA939E8";
   const REPUTATION_REGISTRY = "0x8004B663056A597Dffe9eCcC1965A193B7388713";
+  const IDENTITY_REGISTRY = "0x8004A818BFB912233c491871b3d84c89A494BD9e";
 
   console.log(`📋 Network: Base Sepolia (Chain ID: 84532)`);
   console.log(`   Primus TaskContract: ${PRIMUS_TASK}`);
-  console.log(`   Reputation Registry: ${REPUTATION_REGISTRY}\n`);
+  console.log(`   Reputation Registry: ${REPUTATION_REGISTRY}`);
+  console.log(`   Identity Registry: ${IDENTITY_REGISTRY}\n`);
 
   // STEP 1: Deploy VeritasValidationRegistry
   console.log("📋 STEP 1: Deploying VeritasValidationRegistry...");
@@ -39,12 +48,17 @@ async function main() {
   console.log(`   Address: ${registry.address}`);
   console.log(`   Tx: ${registry.deployTransaction.hash}\n`);
 
-  // STEP 2: Deploy PrimusVeritasApp
+  // STEP 2: Deploy PrimusVeritasApp (with IdentityRegistry)
   console.log("📋 STEP 2: Deploying PrimusVeritasApp...");
   console.log("-".repeat(80));
 
   const App = await hre.ethers.getContractFactory("PrimusVeritasApp");
-  const app = await App.deploy(PRIMUS_TASK, registry.address, REPUTATION_REGISTRY);
+  const app = await App.deploy(
+    PRIMUS_TASK, 
+    registry.address, 
+    REPUTATION_REGISTRY,
+    IDENTITY_REGISTRY  // ✅ NEW: IdentityRegistry for agent verification
+  );
   await app.deployed();
 
   console.log(`✅ PrimusVeritasApp deployed!`);
@@ -94,9 +108,28 @@ async function main() {
   const totalRules = await app.ruleCount();
   console.log(`\n✅ Total rules: ${totalRules}\n`);
 
+  // STEP 4: Verify IdentityRegistry integration
+  console.log("📋 STEP 4: Verifying IdentityRegistry integration...");
+  console.log("-".repeat(80));
+
+  try {
+    const identityRegAddr = await app.identityRegistry();
+    console.log(`✅ IdentityRegistry set: ${identityRegAddr}`);
+    
+    // Test with a registered agent (agent 1)
+    const iface = new hre.ethers.utils.Interface([
+      'function ownerOf(uint256) view returns (address)'
+    ]);
+    const identityReg = new hre.ethers.Contract(IDENTITY_REGISTRY, iface, deployer);
+    const owner1 = await identityReg.ownerOf(1);
+    console.log(`✅ Agent 1 registered, owner: ${owner1}`);
+  } catch (e) {
+    console.log(`❌ Error: ${e.message}`);
+  }
+
   // Summary
   console.log("\n" + "=".repeat(80));
-  console.log("✅ DEPLOYMENT COMPLETE");
+  console.log("✅ DEPLOYMENT COMPLETE - VERITAS V2");
   console.log("=".repeat(80) + "\n");
 
   console.log(`📝 Contract Addresses:\n`);
@@ -108,7 +141,12 @@ async function main() {
   console.log(`📊 Configuration:\n`);
   console.log(`   Network: Base Sepolia`);
   console.log(`   Rules: ${totalRules}`);
-  console.log(`   Primus: ${PRIMUS_TASK}\n`);
+  console.log(`   Primus: ${PRIMUS_TASK}`);
+  console.log(`   IdentityRegistry: ${IDENTITY_REGISTRY}\n`);
+  
+  console.log(`🔐 Agent Verification:\n`);
+  console.log(`   Only registered agents (ERC-8004) can build reputation`);
+  console.log(`   Check: identityRegistry.ownerOf(agentId) must not revert\n`);
 
   return {
     registry: registry.address,

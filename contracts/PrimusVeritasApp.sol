@@ -6,14 +6,29 @@ import "./VeritasValidationRegistry.sol";
 import "./PrimusTaskInterface.sol";
 
 /**
+ * @title IIdentityRegistry
+ * @notice Minimal ERC-8004 IdentityRegistry interface
+ */
+interface IIdentityRegistry {
+    /**
+     * @notice Check if agent is registered (reverts if not)
+     * @param agentId The agent ID to check
+     * @return owner The owner address of the agent
+     */
+    function ownerOf(uint256 agentId) external view returns (address owner);
+}
+
+/**
  * @title PrimusVeritasApp
  * @notice App that fetches attestation from Primus Network
  * @dev Uses callback pattern - Primus calls back when attestation is ready
+ * @dev Only registered agents (ERC-8004) can build reputation
  */
 contract PrimusVeritasApp is IVeritasApp {
     address public owner;
     IPrimusTaskContract public immutable primusTask;
     VeritasValidationRegistry public immutable registry;
+    IIdentityRegistry public immutable identityRegistry;
     
     struct VerificationRule {
         bytes32 urlHash;
@@ -54,12 +69,14 @@ contract PrimusVeritasApp is IVeritasApp {
     constructor(
         address _primusTask,
         address _registry,
-        address _reputationRegistry
+        address _reputationRegistry,
+        address _identityRegistry
     ) {
         owner = msg.sender;
         primusTask = IPrimusTaskContract(_primusTask);
         registry = VeritasValidationRegistry(_registry);
         reputationRegistry = _reputationRegistry;
+        identityRegistry = IIdentityRegistry(_identityRegistry);
     }
     
     // ============================================
@@ -105,8 +122,9 @@ contract PrimusVeritasApp is IVeritasApp {
     /**
      * @notice Request verification - creates a Primus task with callback
      * @dev Primus will call back to this contract when attestation is ready
+     * @dev Only registered agents (ERC-8004) can build reputation
      * @param ruleId Which rule to verify against
-     * @param agentId Agent to credit reputation to
+     * @param agentId Agent to credit reputation to (must be registered in IdentityRegistry)
      * @return taskId The Primus task ID
      */
     function requestVerification(
@@ -115,6 +133,10 @@ contract PrimusVeritasApp is IVeritasApp {
     ) external payable returns (bytes32 taskId) {
         VerificationRule memory rule = rules[ruleId];
         require(rule.active, "Rule inactive");
+        
+        // ✅ CHECK: Agent must be registered in IdentityRegistry (ERC-8004)
+        // This will revert if agent is not registered
+        identityRegistry.ownerOf(agentId);
         
         // Submit task to Primus with callback to THIS contract
         // When attestation is ready, Primus will call our callback function
