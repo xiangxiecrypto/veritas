@@ -1,7 +1,7 @@
 const hre = require("hardhat");
 
 /**
- * Deploy Veritas V2: With IdentityRegistry Integration
+ * Deploy Veritas: Build trust for AI agents with ERC-8004
  * 
  * Flow:
  * 1. Agent registers in IdentityRegistry (ERC-8004) → gets agentId
@@ -12,7 +12,7 @@ const hre = require("hardhat");
 
 async function main() {
   console.log("=".repeat(80));
-  console.log("🚀 DEPLOYING VERITAS V2 - IDENTITY REGISTRY INTEGRATION");
+  console.log("🚀 DEPLOYING VERITAS - ERC-8004 AGENT TRUST");
   console.log("=".repeat(80) + "\n");
 
   const signers = await hre.ethers.getSigners();
@@ -129,7 +129,7 @@ async function main() {
 
   // Summary
   console.log("\n" + "=".repeat(80));
-  console.log("✅ DEPLOYMENT COMPLETE - VERITAS V2");
+  console.log("✅ DEPLOYMENT COMPLETE");
   console.log("=".repeat(80) + "\n");
 
   console.log(`📝 Contract Addresses:\n`);

@@ -94,7 +94,7 @@ const { agentId, taskId } = await sdk.registerAndVerify("My Agent", "AI assistan
 npx hardhat compile
 
 # Deploy to Base Sepolia
-npx hardhat run scripts/deploy-veritas-v2.js --network baseSepolia
+npx hardhat run scripts/deploy.js --network baseSepolia
 
 # Test verification
 node scripts/test-step2.js
