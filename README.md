@@ -124,7 +124,7 @@ require(msg.sender == agentOwner, "Not agent owner");
 
 ## 🔗 Links
 
-- **Primus Network**: https://primus.xyz
+- **Primus Network**: https://docs.primuslabs.xyz/primus-network/tech-intro
 - **Base Sepolia Explorer**: https://sepolia.basescan.org
 - **ERC-8004 Spec**: https://eips.ethereum.org/EIPS/eip-8004
 

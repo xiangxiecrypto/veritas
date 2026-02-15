@@ -71,4 +71,4 @@ const taskId = await sdk.requestVerification(agentId, 0);
 ## Links
 
 - [ERC-8004 Specification](https://eips.ethereum.org/EIPS/eip-8004)
-- [Primus Network](https://primus.xyz)
+- [Primus Network](https://docs.primuslabs.xyz/primus-network/tech-intro)
