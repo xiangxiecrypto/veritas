@@ -1,142 +1,132 @@
-# Veritas Protocol - Primus zkTLS Integration
+# Veritas Protocol
 
-Trustless on-chain verification of web data using Primus zkTLS attestations.
+**Build trust for AI agents with ERC-8004.**
+
+Veritas combines ERC-8004 agent identity with Primus zkTLS attestations to create verifiable, on-chain reputation for AI agents.
+
+## 🎯 Why Veritas?
+
+AI agents need trust. Veritas provides:
+- **Identity**: Permanent on-chain agent registration (ERC-8004)
+- **Reputation**: Verifiable attestations from real-world data
+- **Security**: Only registered agents can build reputation
+
+## 📋 Two-Step Flow
+
+```
+STEP 1: REGISTER IDENTITY
+Agent → IdentityRegistry.register() → agentId
+
+STEP 2: BUILD REPUTATION  
+Agent Owner → PrimusVeritasApp.requestVerification(agentId)
+            → Primus attests → Reputation granted
+```
+
+**Key Security:**
+- ✅ Only registered agents can build reputation
+- ✅ Only the agent owner can request verification
+- ✅ Cryptographic proof via zkTLS
+
+## 🚀 Quick Start
+
+### Install
+
+```bash
+npm install ethers @primuslabs/network-core-sdk
+```
+
+### Register & Verify
+
+```typescript
+import { VeritasSDK } from './src/sdk';
+import { ethers } from 'ethers';
+
+const provider = new ethers.providers.JsonRpcProvider('https://sepolia.base.org');
+const signer = new ethers.Wallet(PRIVATE_KEY, provider);
+const sdk = new VeritasSDK({ provider, signer, network: 'sepolia' });
+
+// STEP 1: Register agent identity
+const agentId = await sdk.registerIdentity("My Agent", "AI assistant");
+
+// STEP 2: Build reputation via attestation
+const taskId = await sdk.requestVerification(agentId, 0); // Rule 0 = BTC price
+
+// Or do both:
+const { agentId, taskId } = await sdk.registerAndVerify("My Agent", "AI assistant");
+```
 
 ## 📋 Deployed Contracts (Base Sepolia)
 
-| Contract | Address |
-|----------|---------|
-| **PrimusVeritasApp** | [`0x0560B5dACDc476A1289F8Db7D4760fe1D079FF8e`](https://sepolia.basescan.org/address/0x0560B5dACDc476A1289F8Db7D4760fe1D079FF8e) |
-| **VeritasValidationRegistry** | [`0x44A607d073c63f975101e271fEe52EDFF78D715d`](https://sepolia.basescan.org/address/0x44A607d073c63f975101e271fEe52EDFF78D715d) |
-| **Primus TaskContract** | [`0xC02234058caEaA9416506eABf6Ef3122fCA939E8`](https://sepolia.basescan.org/address/0xC02234058caEaA9416506eABf6Ef3122fCA939E8) |
-| **Reputation Registry** | [`0x8004B663056A597Dffe9eCcC1965A193B7388713`](https://sepolia.basescan.org/address/0x8004B663056A597Dffe9eCcC1965A193B7388713) |
+| Contract | Address | Purpose |
+|----------|---------|---------|
+| **IdentityRegistry** | [`0x8004A818BFB912233c491871b3d84c89A494BD9e`](https://sepolia.basescan.org/address/0x8004A818BFB912233c491871b3d84c89A494BD9e) | Step 1: Register identity |
+| **PrimusVeritasApp** | [`0x0560B5dACDc476A1289F8Db7D4760fe1D079FF8e`](https://sepolia.basescan.org/address/0x0560B5dACDc476A1289F8Db7D4760fe1D079FF8e) | Step 2: Build reputation |
+| **VeritasValidationRegistry** | [`0x44A607d073c63f975101e271fEe52EDFF78D715d`](https://sepolia.basescan.org/address/0x44A607d073c63f975101e271fEe52EDFF78D715d) | Validate attestations |
+| **ReputationRegistry** | [`0x8004B663056A597Dffe9eCcC1965A193B7388713`](https://sepolia.basescan.org/address/0x8004B663056A597Dffe9eCcC1965A193B7388713) | Store reputation |
+| **Primus TaskContract** | [`0xC02234058caEaA9416506eABf6Ef3122fCA939E8`](https://sepolia.basescan.org/address/0xC02234058caEaA9416506eABf6Ef3122fCA939E8) | zkTLS infrastructure |
 
 ## 🏗️ Architecture
 
 ```
-┌─────────┐     requestVerification()     ┌──────────────────┐
-│         │ ──────────────────────────────▶                  │
-│   USER  │                                │ PrimusVeritasApp │
-│         │ ◀──────────────────────────────│                  │
-└─────────┘     taskId returned            └────────┬─────────┘
-                                                    │
-                         submitTask(callback=this)  │
-                                                    ▼
-                                          ┌──────────────────┐
-                                          │ Primus TaskContract│
-                                          │                    │
-                                          │ 1. Create task     │
-                                          │ 2. zkTLS attests   │
-                                          │ 3. Call callback   │
-                                          └────────┬─────────┘
-                                                   │
-                         onAttestationComplete()   │
-                                                   ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                       PrimusVeritasApp                               │
-│                                                                      │
-│  • Verify caller is Primus                                          │
-│  • Extract attestation data                                          │
-│  • Call Registry.validateAttestation()                               │
-└──────────────────────────────────────────────────────────────────────┘
-                                                   │
-                                                   ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                   VeritasValidationRegistry                          │
-│                                                                      │
-│  Validation Checks:                                                  │
-│  1. ✅ Anti-Replay (taskId not used)                                │
-│  2. ✅ URL Match (hash comparison)                                  │
-│  3. ✅ Data Key (exists in attestation)                             │
-│  4. ✅ Recipient (matches tx.origin)                                │
-│  5. ✅ Freshness (not expired)                                      │
-│  6. ✅ Custom Check (app callback)                                  │
-│  7. ✅ Grant Reputation                                              │
-└──────────────────────────────────────────────────────────────────────┘
-                                                   │
-                                                   ▼
-                                          ┌──────────────────┐
-                                          │ Reputation System│
-                                          │   (ERC-8004)     │
-                                          └──────────────────┘
+┌──────────────────┐     ┌─────────────────────┐     ┌──────────────────┐
+│  IdentityRegistry│     │  PrimusVeritasApp   │     │ ReputationRegistry│
+│    (ERC-8004)    │     │                     │     │    (ERC-8004)    │
+├──────────────────┤     ├─────────────────────┤     ├──────────────────┤
+│ register()       │────→│ requestVerification │────→│ giveFeedback()   │
+│ ownerOf()        │     │ onAttestationComplete│     │ getSummary()     │
+└──────────────────┘     └─────────────────────┘     └──────────────────┘
+         ↑                         ↑                         ↑
+         │                         │                         │
+    Step 1: Identity         Step 2: Attestation       Result: Reputation
 ```
 
-## 🚀 Quick Start
+## 📊 Verification Rules
 
-### Request Verification
+| ID | URL | Score | What it proves |
+|----|-----|-------|----------------|
+| 0 | Coinbase BTC/USD | 100 | Agent can fetch live BTC price |
+| 1 | Coinbase ETH/USD | 95 | Agent can fetch live ETH price |
 
-```javascript
-const app = new ethers.Contract(APP_ADDRESS, ABI, wallet);
-
-// One function call - everything else is automatic!
-const tx = await app.requestVerification(
-    0,      // ruleId (0 = BTC/USD, 1 = ETH/USD)
-    12345,  // agentId (who gets reputation)
-    { value: ethers.utils.parseEther("0.00000001") }
-);
-
-const receipt = await tx.wait();
-// taskId is returned - Primus will call back automatically
-```
-
-### Add New Rule
-
-```javascript
-await app.addRule(
-    "https://api.example.com/data",  // URL to verify
-    "data.value",                     // JSON key to check
-    100,                              // reputation score
-    0,                                // decimals
-    3600,                             // maxAge (seconds)
-    "Example Rule"                    // description
-);
-```
-
-## 📁 Contract Files
-
-| File | Description |
-|------|-------------|
-| `PrimusVeritasApp.sol` | Main app with callback pattern |
-| `VeritasValidationRegistry.sol` | Pure validation logic |
-| `PrimusTaskInterface.sol` | Official Primus interface |
-| `IVeritasApp.sol` | App interface for callback |
-
-## 🔧 Deployment
+## 🔧 Development
 
 ```bash
-# Compile
+# Compile contracts
 npx hardhat compile
 
 # Deploy to Base Sepolia
-npx hardhat run scripts/deploy-veritas-new-arch.js --network baseSepolia
+npx hardhat run scripts/deploy-veritas-v2.js --network baseSepolia
+
+# Check identity registry
+node scripts/check-identity-registry.js
 ```
 
-## 📊 Current Rules
+## 📁 Project Structure
 
-| ID | URL | Data Key | Score | Max Age |
-|----|-----|----------|-------|---------|
-| 0 | Coinbase BTC/USD | data.rates.USD | 100 | 1 hour |
-| 1 | Coinbase ETH/USD | data.rates.USD | 95 | 2 hours |
+| File | Description |
+|------|-------------|
+| `contracts/PrimusVeritasApp.sol` | Main app with agent verification |
+| `contracts/VeritasValidationRegistry.sol` | Pure validation logic |
+| `contracts/PrimusTaskInterface.sol` | Primus zkTLS interface |
+| `src/sdk.ts` | TypeScript SDK |
+
+## 🔐 Security
+
+```solidity
+// Only registered agents can build reputation
+address agentOwner = identityRegistry.ownerOf(agentId);
+require(msg.sender == agentOwner, "Not agent owner");
+```
+
+- Agent must be registered (Step 1) before building reputation (Step 2)
+- Only the agent owner can request verification
+- Attestations are cryptographically verified via zkTLS
+- Anti-replay protection via taskId tracking
 
 ## 🔗 Links
 
 - **Primus Network**: https://primus.xyz
 - **Base Sepolia Explorer**: https://sepolia.basescan.org
-- **ERC-8004**: https://eips.ethereum.org/EIPS/eip-8004
-
-## 📝 Key Features
-
-1. **Callback Pattern**: Primus automatically calls back when attestation is ready
-2. **No User Action Needed**: User only calls `requestVerification()` once
-3. **Pure Validation**: Registry has no dependencies, just validates data
-4. **Gas Optimized**: Uses URL hash for efficient comparison
-
-## 🔐 Security
-
-- Only Primus TaskContract can call the callback function
-- Anti-replay protection via taskId tracking
-- Recipient must match tx.origin
-- Attestation must be fresh (within maxAge)
+- **ERC-8004 Spec**: https://eips.ethereum.org/EIPS/eip-8004
 
 ## 📜 License
 
