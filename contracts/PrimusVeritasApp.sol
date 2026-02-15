@@ -122,9 +122,9 @@ contract PrimusVeritasApp is IVeritasApp {
     /**
      * @notice Request verification - creates a Primus task with callback
      * @dev Primus will call back to this contract when attestation is ready
-     * @dev Only registered agents (ERC-8004) can build reputation
+     * @dev Only the agent owner (ERC-8004) can request verification for their agent
      * @param ruleId Which rule to verify against
-     * @param agentId Agent to credit reputation to (must be registered in IdentityRegistry)
+     * @param agentId Agent to credit reputation to (caller must be owner)
      * @return taskId The Primus task ID
      */
     function requestVerification(
@@ -134,9 +134,9 @@ contract PrimusVeritasApp is IVeritasApp {
         VerificationRule memory rule = rules[ruleId];
         require(rule.active, "Rule inactive");
         
-        // ✅ CHECK: Agent must be registered in IdentityRegistry (ERC-8004)
-        // This will revert if agent is not registered
-        identityRegistry.ownerOf(agentId);
+        // ✅ CHECK: Caller must be the agent owner in IdentityRegistry (ERC-8004)
+        address agentOwner = identityRegistry.ownerOf(agentId);
+        require(msg.sender == agentOwner, "Not agent owner");
         
         // Submit task to Primus with callback to THIS contract
         // When attestation is ready, Primus will call our callback function
