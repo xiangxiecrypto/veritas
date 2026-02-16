@@ -2,119 +2,100 @@
 
 **Build trust for AI agents with ERC-8004.**
 
-Veritas is a trust infrastructure that combines ERC-8004 agent identity with Primus zkTLS attestations to build verifiable reputation for AI agents.
-
-## Two-Step Flow
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  STEP 1: REGISTER IDENTITY (ERC-8004)                           │
-│                                                                 │
-│  Agent → IdentityRegistry.register() → gets agentId             │
-│                                                                 │
-│  This creates a permanent, on-chain identity for the agent.    │
-│                                                                 │
-│  Contract: 0x8004A818BFB912233c491871b3d84c89A494BD9e           │
-└─────────────────────────────────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────────┐
-│  STEP 2: BUILD REPUTATION (Primus Attestation)                  │
-│                                                                 │
-│  Agent Owner → PrimusVeritasApp.requestVerification(agentId)    │
-│                                                                 │
-│  ✅ Only registered agents can build reputation                 │
-│  ✅ Only the agent owner can request verification               │
-│                                                                 │
-│  Primus attests off-chain → Callback → Reputation granted       │
-└─────────────────────────────────────────────────────────────────┘
-```
+Veritas combines ERC-8004 agent identity with Primus zkTLS attestations to build verifiable reputation for AI agents.
 
 ## Deployed Contracts (Base Sepolia)
 
 | Contract | Address | Purpose |
 |----------|---------|---------|
-| **IdentityRegistry** | `0x8004A818BFB912233c491871b3d84c89A494BD9e` | Register agent identities (Step 1) |
-| **PrimusVeritasApp** | `0xa70063A1970c9c10d0663610Fe7a02495548ba9b` | Build reputation via attestation (Step 2) |
-| **VeritasValidationRegistry** | `0x0531Cf433aBc7fA52bdD03B7214d522DAB7Db948` | Validate attestations |
+| **IdentityRegistry** | `0x8004A818BFB912233c491871b3d84c89A494BD9e` | Register agent identities (ERC-8004) |
+| **PrimusVeritasAppV2** | `0x0552bD6434D79073d1167BC39d4D01f6c3333F6e` | Verification app with SDK integration |
+| **VeritasValidationRegistryV2** | `0xF18C120B0cc018c0862eDaE6B89AB2485FD35EE3` | Validate attestations |
 | **ReputationRegistry** | `0x8004B663056A597Dffe9eCcC1965A193B7388713` | Store reputation scores |
 | **Primus TaskContract** | `0xC02234058caEaA9416506eABf6Ef3122fCA939E8` | Primus zkTLS infrastructure |
 
 **Owner:** `0x89BBf3451643eef216c3A60d5B561c58F0D8adb9`
 
-## Security
+## Two-Step Flow
 
-### Only Registered Agents Can Build Reputation
-```solidity
-// In PrimusVeritasApp.requestVerification()
-address agentOwner = identityRegistry.ownerOf(agentId);
-require(msg.sender == agentOwner, "Not agent owner");
 ```
+STEP 1: REGISTER IDENTITY (ERC-8004)
+  Agent → IdentityRegistry.register() → gets agentId
 
-This ensures:
-1. Agent must be registered in IdentityRegistry (Step 1)
-2. Caller must be the owner of that agent
-3. Nobody can build reputation for an agent they don't own
+STEP 2: BUILD REPUTATION (SDK Integration)
+  1. requestVerification(ruleId, agentId) → submits to Primus
+  2. SDK.attest() → zkTLS attestation (off-chain)
+  3. submitAttestation() → validates & grants reputation
+```
 
 ## Verification Rules
 
-| ID | URL | Score | Max Age | Description |
-|----|-----|-------|---------|-------------|
-| 0 | Coinbase BTC/USD | 100 | 1h | Proves agent can fetch BTC price |
-| 1 | Coinbase ETH/USD | 95 | 2h | Proves agent can fetch ETH price |
+| ID | URL | Data Key | Score | Max Age |
+|----|-----|----------|-------|---------|
+| 0 | Coinbase BTC/USD | `data.rates.USD` | 100 | 1h |
+| 1 | Coinbase ETH/USD | `data.rates.USD` | 95 | 2h |
+| 2 | Coinbase BTC/USD | `btcPrice` | 100 | 1h |
+
+**Working Rule:** Rule 2 with `dataKey="btcPrice"` (matches SDK keyName)
 
 ## SDK Usage
 
-```typescript
-import { VeritasSDK } from './src/sdk';
-import { ethers } from 'ethers';
+```javascript
+const { PrimusNetwork } = require('@primuslabs/network-core-sdk');
 
-const provider = new ethers.providers.JsonRpcProvider('https://sepolia.base.org');
-const signer = new ethers.Wallet(PRIVATE_KEY, provider);
-const sdk = new VeritasSDK({ provider, signer, network: 'sepolia' });
+// Step 1: Request verification
+const tx = await app.requestVerification(2, agentId, { value: ethers.BigNumber.from('10000000000') });
 
-// STEP 1: Register identity
-const agentId = await sdk.registerIdentity("My Agent", "AI assistant");
+// Step 2: Attest via SDK
+const primus = new PrimusNetwork();
+await primus.init(wallet, 84532);
 
-// STEP 2: Build reputation
-const taskId = await sdk.requestVerification(agentId, 0); // Rule 0 = BTC price
+const result = await primus.attest({
+  taskId,
+  taskTxHash: tx.hash,
+  taskAttestors: ['0x0DE886e31723e64Aa72e51977B14475fB66a9f72'],
+  requests: [{ url: 'https://api.coinbase.com/v2/exchange-rates?currency=BTC', method: 'GET' }],
+  responseResolves: [[{ keyName: 'btcPrice', parsePath: '$.data.rates.USD' }]]  // Array of arrays!
+}, 60000);
 
-// Or do both in one call:
-const { agentId, taskId } = await sdk.registerAndVerify("My Agent", "AI assistant");
+// Step 3: Submit attestation
+await app.submitAttestation(taskId, url, result[0].attestation.data, timestamp);
 ```
 
-## Architecture
+## Critical Details
 
-```
-┌──────────────────┐     ┌─────────────────────┐     ┌──────────────────┐
-│  IdentityRegistry│     │  PrimusVeritasApp   │     │ ReputationRegistry│
-│    (ERC-8004)    │     │                     │     │    (ERC-8004)    │
-├──────────────────┤     ├─────────────────────┤     ├──────────────────┤
-│ register()       │────→│ requestVerification │────→│ giveFeedback()   │
-│ ownerOf()        │     │ onAttestationComplete│     │ getSummary()     │
-│ tokenURI()       │     │                     │     │                  │
-└──────────────────┘     └─────────────────────┘     └──────────────────┘
-         ↑                         ↑                         ↑
-         │                         │                         │
-    Step 1: Identity         Step 2: Attestation       Result: Reputation
-```
+1. **Primus doesn't auto-callback** - Must call `submitAttestation()` manually
+2. **SDK responseResolves** must be `[[{...}]]` (array of arrays)
+3. **URL is in `taskInfo.templateId`**, not `attestation.request`
+4. **dataKey must match SDK keyName** (e.g., `"btcPrice"`)
+5. **Fee is exactly 10^10 wei** = 0.00000001 ETH
+6. **Timestamp is in seconds** for contract, milliseconds from SDK
 
-## Primus Interface
+## Test Results
 
-```solidity
-submitTask(address, string, uint256, uint8, address) // 0x5ae543eb
-queryTask(bytes32) // 0x8d3943ec
-```
+- Tx: `0x8a6741e799b5dd04bb6e6945a2f6f15d72041749ca30ac3ea7391d1ee4a159fa`
+- Agent ID: 674, Score: 100 ✅
+- Event: `VerificationCompleted` emitted successfully
 
 ## Files
 
-- `contracts/PrimusVeritasApp.sol` - Main app with agent verification
-- `contracts/VeritasValidationRegistry.sol` - Pure validation logic
-- `contracts/PrimusTaskInterface.sol` - Primus interface
-- `src/sdk.ts` - TypeScript SDK
-- `scripts/deploy-veritas-v2.js` - Deployment script
+```
+contracts/
+  IVeritasApp.sol              - Interface
+  PrimusTaskInterface.sol      - Primus interface
+  PrimusVeritasAppV2.sol       - Main app (current)
+  VeritasValidationRegistryV2.sol - Validation logic (current)
+  _deprecated/                 - Old versions
 
-## Deprecated
+scripts/
+  deploy-app-v2.js             - Deployment script
+  _deprecated/                 - Old scripts
 
-- `contracts/_deprecated/` - Old contracts
-- `scripts/_deprecated/` - Old scripts
-- `_archive/` - Old docs
+src/
+  sdk.ts                       - TypeScript SDK
+```
+
+## Links
+
+- [Flow Details](./FLOW_DETAILS.md) - Complete technical documentation
+- [Explorer](https://sepolia.basescan.org/address/0x0552bD6434D79073d1167BC39d4D01f6c3333F6e)

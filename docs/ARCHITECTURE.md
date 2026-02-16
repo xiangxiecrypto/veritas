@@ -8,161 +8,157 @@
 ├──────────────────────────────────────────────────────────────────────┤
 │                                                                       │
 │  ┌──────────────────┐     ┌─────────────────────┐                    │
-│  │ IdentityRegistry │     │  PrimusVeritasApp   │                    │
+│  │ IdentityRegistry │     │ PrimusVeritasAppV2  │                    │
 │  │    (ERC-8004)    │     │                     │                    │
 │  ├──────────────────┤     ├─────────────────────┤                    │
 │  │ • register()     │────→│ • requestVerification()                  │
-│  │ • ownerOf()      │     │ • onAttestationComplete()                │
+│  │ • ownerOf()      │     │ • submitAttestation()│                    │
 │  │ • tokenURI()     │     │ • rules[]           │                    │
 │  └──────────────────┘     └──────────┬──────────┘                    │
 │           ↑                          │                                │
 │           │                          ↓                                │
 │           │              ┌──────────────────────┐                     │
-│           │              │  Primus TaskContract │                     │
-│           │              │  (zkTLS Attestation) │                     │
-│           │              └──────────┬───────────┘                     │
-│           │                         │                                 │
-│           │                         ↓                                 │
-│           │              ┌──────────────────────┐                     │
-│           │              │ VeritasValidationRegistry │                │
-│           │              ├──────────────────────┤                     │
-│           │              │ • validateAttestation()                    │
-│           │              │ • URL check          │                     │
-│           │              │ • Data check         │                     │
-│           │              │ • Freshness check    │                     │
-│           │              └──────────┬───────────┘                     │
-│           │                         │                                 │
-│           │                         ↓                                 │
-│           │              ┌──────────────────────┐                     │
-│           └─────────────→│ ReputationRegistry   │                     │
-│                          │    (ERC-8004)        │                     │
+│  Agent Identity          │  Primus TaskContract │                     │
+│  (ERC-8004 NFT)          │  (zkTLS Attestation) │                     │
+│                          └──────────┬───────────┘                     │
+│                                     │                                 │
+│                          ┌──────────┴───────────┐                     │
+│                          │   SDK.attest()       │                     │
+│                          │   (Off-chain zkTLS)  │                     │
+│                          └──────────────────────┘                     │
+│                                     │                                 │
+│                                     ↓                                 │
+│                          ┌──────────────────────┐                     │
+│                          │VeritasValidationRegV2│                     │
+│                          ├──────────────────────┤                     │
+│                          │ • validateAttestation()                    │
+│                          │ • URL hash check     │                     │
+│                          │ • Data key extraction│                     │
+│                          └──────────┬───────────┘                     │
+│                                     │                                 │
+│                                     ↓                                 │
+│                          ┌──────────────────────┐                     │
+│                          │  ReputationRegistry  │                     │
+│                          │      (ERC-8004)      │                     │
 │                          ├──────────────────────┤                     │
 │                          │ • giveFeedback()     │                     │
-│                          │ • getSummary()       │                     │
+│                          │ • Agent reputation   │                     │
 │                          └──────────────────────┘                     │
-│                                                                       │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-## Contract Components
+## Contract Addresses (Base Sepolia)
 
-### 1. IdentityRegistry (ERC-8004)
-
-**Purpose**: Register and manage agent identities.
-
-**Key Functions**:
-| Function | Description |
-|----------|-------------|
-| `register(agentURI)` | Register new agent, returns agentId |
-| `ownerOf(agentId)` | Get agent owner address |
-| `tokenURI(agentId)` | Get agent metadata |
-
-**Deployed**: `0x8004A818BFB912233c491871b3d84c89A494BD9e` (Base Sepolia)
-
-### 2. PrimusVeritasApp
-
-**Purpose**: Handle verification requests and Primus integration.
-
-**Key Functions**:
-| Function | Description |
-|----------|-------------|
-| `requestVerification(ruleId, agentId)` | Request attestation (only owner) |
-| `onAttestationComplete()` | Callback from Primus |
-| `addRule()` | Add new verification rule |
-
-**Security Check**:
-```solidity
-address agentOwner = identityRegistry.ownerOf(agentId);
-require(msg.sender == agentOwner, "Not agent owner");
-```
-
-**Deployed**: `0xa70063A1970c9c10d0663610Fe7a02495548ba9b` (Base Sepolia)
-
-### 3. VeritasValidationRegistry
-
-**Purpose**: Pure validation logic for attestations.
-
-**Validation Steps**:
-1. Anti-replay check (taskId not used)
-2. URL verification (hash match)
-3. Data key verification
-4. Recipient verification (matches tx.origin)
-5. Freshness check (within maxAge)
-6. Custom check (app callback)
-
-**Deployed**: `0x0531Cf433aBc7fA52bdD03B7214d522DAB7Db948` (Base Sepolia)
-
-### 4. ReputationRegistry (ERC-8004)
-
-**Purpose**: Store and aggregate reputation scores.
-
-**Key Functions**:
-| Function | Description |
-|----------|-------------|
-| `giveFeedback()` | Grant reputation (called by VeritasValidationRegistry) |
-| `getSummary()` | Get aggregated reputation |
-
-**Deployed**: `0x8004B663056A597Dffe9eCcC1965A193B7388713` (Base Sepolia)
-
-### 5. Primus TaskContract
-
-**Purpose**: zkTLS attestation infrastructure (deployed by Primus).
-
-**Key Functions**:
-| Function | Description |
-|----------|-------------|
-| `submitTask()` | Submit attestation request |
-| `queryTask()` | Query task result |
-
-**Deployed**: `0xC02234058caEaA9416506eABf6Ef3122fCA939E8` (Base Sepolia)
+| Contract | Address | Purpose |
+|----------|---------|---------|
+| IdentityRegistry | `0x8004A818BFB912233c491871b3d84c89A494BD9e` | ERC-8004 agent identity |
+| PrimusVeritasAppV2 | `0x0552bD6434D79073d1167BC39d4D01f6c3333F6e` | Verification app |
+| VeritasValidationRegistryV2 | `0xF18C120B0cc018c0862eDaE6B89AB2485FD35EE3` | Validation logic |
+| ReputationRegistry | `0x8004B663056A597Dffe9eCcC1965A193B7388713` | Reputation storage |
+| Primus TaskContract | `0xC02234058caEaA9416506eABf6Ef3122fCA939E8` | zkTLS infrastructure |
 
 ## Data Flow
 
+### Step 1: Identity Registration
 ```
-1. REGISTER
-   User → IdentityRegistry.register() → agentId
-
-2. REQUEST
-   Agent Owner → PrimusVeritasApp.requestVerification(agentId)
-                ↓
-                Check: msg.sender == ownerOf(agentId)
-                ↓
-                PrimusTaskContract.submitTask()
-                ↓
-                Return taskId
-
-3. ATTEST (Off-chain)
-   Primus → Fetch URL (e.g., Coinbase API)
-          → Create zkTLS attestation
-          → Sign attestation
-
-4. CALLBACK
-   Primus → PrimusVeritasApp.onAttestationComplete()
-           ↓
-           VeritasValidationRegistry.validateAttestation()
-           ↓
-           ReputationRegistry.giveFeedback()
-
-5. RESULT
-   Agent now has on-chain reputation
+User → IdentityRegistry.register(name, metadata) → agentId (NFT)
 ```
 
-## Verification Rules
+### Step 2: Verification Request
+```
+Agent Owner → PrimusVeritasAppV2.requestVerification(ruleId, agentId)
+           → PrimusTask.submitTask(callback=App)
+           → taskId
+```
 
-Rules define what URLs to attest and reputation scores:
+### Step 3: Attestation (Off-Chain)
+```
+SDK → Primus Network (Phala TEE)
+    → HTTPS request to target URL
+    → zkTLS proof generation
+    → Attestation data stored on-chain
+```
 
+### Step 4: Submit Attestation
+```
+User → PrimusVeritasAppV2.submitAttestation(taskId, url, data, timestamp)
+    → queryTask() verification
+    → ValidationRegistry.validateAttestation()
+    → ReputationRegistry.giveFeedback()
+    → Reputation granted!
+```
+
+## Security Model
+
+### Ownership Verification
 ```solidity
-struct VerificationRule {
-    string url;        // URL to attest
-    string dataKey;    // JSON key to verify
-    int128 score;      // Reputation points
-    uint256 maxAge;    // Freshness requirement
-    bool active;       // Rule enabled?
-}
+// Only agent owner can request verification
+address agentOwner = IdentityRegistry.ownerOf(agentId);
+require(msg.sender == agentOwner, "Not agent owner");
 ```
 
-**Current Rules**:
-| ID | URL | Score | Max Age |
-|----|-----|-------|---------|
-| 0 | Coinbase BTC/USD | 100 | 1 hour |
-| 1 | Coinbase ETH/USD | 95 | 2 hours |
+### Attestation Validation
+```solidity
+// Verify attestation comes from Primus
+TaskInfo memory taskInfo = primusTask.queryTask(taskId);
+require(taskInfo.taskStatus == 1, "Task not completed");
+require(taskInfo.callback == address(this), "Not our task");
+
+// Verify URL matches
+require(keccak256(bytes(taskInfo.templateId)) == keccak256(bytes(url)));
+
+// Verify data matches
+require(keccak256(bytes(att.data)) == keccak256(bytes(data)));
+```
+
+### Data Key Extraction
+```solidity
+// Extract value from JSON using dataKey
+// e.g., {"btcPrice":"68164.45"} with key "btcPrice" → 68164.45
+require(_containsDataKey(data, key), "Data key not found");
+```
+
+## Key Design Decisions
+
+### 1. SDK Integration (Not Auto-Callback)
+Primus does NOT automatically call back to contracts. The SDK handles attestation off-chain, then we manually submit to our contract.
+
+**Why?** Primus TaskContract doesn't have callback mechanisms in bytecode.
+
+### 2. Callback Address is Informational
+The `callback` parameter in `submitTask()` is stored but not used by Primus. We use `queryTask()` to verify instead.
+
+### 3. URL in templateId
+The attestation URL is in `taskInfo.templateId`, not `attestation.request` (which is empty).
+
+### 4. Data Key Matching
+The rule's `dataKey` must match SDK's `keyName` exactly:
+- Rule: `dataKey = "btcPrice"`
+- SDK: `keyName = "btcPrice"`
+
+### 5. Exact Fee
+Primus requires exactly 10^10 wei (0.00000001 ETH). Any deviation fails.
+
+## Gas Costs
+
+| Function | Gas (approx) |
+|----------|--------------|
+| requestVerification | ~250,000 |
+| submitAttestation | ~380,000 |
+| Total per verification | ~630,000 |
+
+## File Structure
+
+```
+contracts/
+├── IVeritasApp.sol              # Interface for custom checks
+├── PrimusTaskInterface.sol      # Primus TaskContract interface
+├── PrimusVeritasAppV2.sol       # Main verification app
+└── VeritasValidationRegistryV2.sol # Validation logic
+
+scripts/
+└── deploy-app-v2.js             # Deployment script
+
+src/
+└── sdk.ts                       # TypeScript SDK
+```

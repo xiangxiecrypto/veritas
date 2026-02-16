@@ -47,4 +47,6 @@ interface IPrimusTaskContract {
     ) external payable returns (bytes32 taskId);
 
     function queryTask(bytes32 taskId) external view returns (TaskInfo memory taskInfo);
+    
+    function withdrawBalance(TokenSymbol tokenSymbol, uint256 limit) external;
 }

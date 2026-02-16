@@ -1,188 +1,291 @@
 # Workflow
 
-## Quick Reference
+## Complete Verification Flow
 
-```
-STEP 1: REGISTER → IdentityRegistry.register() → agentId
-STEP 2: VERIFY   → PrimusVeritasApp.requestVerification(agentId) → reputation
+This guide walks through the complete process of registering an agent and building its reputation.
+
+### Prerequisites
+
+- Node.js 18+
+- Private key with ETH on Base Sepolia
+- Agent metadata (name, description)
+
+### Installation
+
+```bash
+npm install ethers @primuslabs/network-core-sdk
 ```
 
 ## Step-by-Step Guide
 
 ### Step 1: Register Agent Identity
 
-Register your agent to get a permanent on-chain identity.
-
-**Using SDK:**
-
-```typescript
-import { VeritasSDK } from './src/sdk';
-import { ethers } from 'ethers';
-
-// Setup
-const provider = new ethers.providers.JsonRpcProvider('https://sepolia.base.org');
-const signer = new ethers.Wallet(PRIVATE_KEY, provider);
-const sdk = new VeritasSDK({ provider, signer, network: 'sepolia' });
-await sdk.initialize();
-
-// Register
-const agentId = await sdk.registerIdentity("My Agent", "AI trading assistant");
-console.log(`Agent ID: ${agentId}`);
-```
-
-**Using Contract Directly:**
-
 ```javascript
-const identityRegistry = new ethers.Contract(
-  '0x8004A818BFB912233c491871b3d84c89A494BD9e',
-  ['function register(string) returns (uint256)'],
-  signer
+const { ethers } = require('ethers');
+
+const provider = new ethers.providers.JsonRpcProvider('https://sepolia.base.org');
+const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
+
+const IDENTITY_REGISTRY = '0x8004A818BFB912233c491871b3d84c89A494BD9e';
+
+const identityAbi = [
+  "function register(string calldata name, string calldata metadata) external returns (uint256)",
+  "function ownerOf(uint256) view returns (address)"
+];
+
+const identity = new ethers.Contract(IDENTITY_REGISTRY, identityAbi, wallet);
+
+// Register agent
+const tx = await identity.register(
+  'My AI Agent',
+  JSON.stringify({ description: 'AI assistant for DeFi' })
 );
 
-const metadata = JSON.stringify({
-  type: "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
-  name: "My Agent",
-  description: "AI trading assistant"
-});
-const agentURI = 'data:application/json;base64,' + Buffer.from(metadata).toString('base64');
-
-const tx = await identityRegistry.register(agentURI);
 const receipt = await tx.wait();
-// Get agentId from Registered event
+console.log('Agent registered!');
+
+// Get agentId from event
+const agentId = ...; // Extract from Transfer event
+console.log('Agent ID:', agentId.toString());
 ```
 
 ### Step 2: Request Verification
 
-Build reputation by requesting attestation.
+```javascript
+const APP = '0x0552bD6434D79073d1167BC39d4D01f6c3333F6e';
+const FEE = ethers.BigNumber.from('10000000000'); // 0.00000001 ETH
 
-**Using SDK:**
+const appAbi = [
+  "function requestVerification(uint256 ruleId, uint256 agentId) external payable returns (bytes32)"
+];
 
-```typescript
-// Check available rules
-const rules = await sdk.getVerificationRules();
-console.log(rules);
-// [
-//   { id: 0, url: 'Coinbase BTC/USD', score: 100, ... },
-//   { id: 1, url: 'Coinbase ETH/USD', score: 95, ... }
-// ]
+const app = new ethers.Contract(APP, appAbi, wallet);
 
-// Request verification (must be agent owner)
-const taskId = await sdk.requestVerification(agentId, 0); // Rule 0 = BTC price
-console.log(`Task ID: ${taskId}`);
+// Request verification for BTC/USD (rule 2)
+const tx = await app.requestVerification(
+  2,      // ruleId: BTC/USD with btcPrice key
+  agentId,
+  { value: FEE, gasLimit: 500000 }
+);
+
+const receipt = await tx.wait();
+
+// Extract taskId from Primus event
+const primusLog = receipt.logs.find(l => 
+  l.address.toLowerCase() === '0xC02234058caEaA9416506eABf6Ef3122fCA939E8'.toLowerCase()
+);
+
+const decoded = ethers.utils.defaultAbiCoder.decode(
+  ['bytes32', 'string', 'address[]', 'uint256'],
+  primusLog.data
+);
+
+const taskId = decoded[0];
+console.log('Task ID:', taskId);
+console.log('Task URL:', decoded[1]);
 ```
 
-**Using Contract Directly:**
+### Step 3: Attest via SDK
 
 ```javascript
-const app = new ethers.Contract(
-  '0xa70063A1970c9c10d0663610Fe7a02495548ba9b',
-  ['function requestVerification(uint256,uint256) payable returns (bytes32)'],
-  signer
-);
+const { PrimusNetwork } = require('@primuslabs/network-core-sdk');
 
-const tx = await app.requestVerification(0, agentId, {
-  value: ethers.utils.parseEther('0.00000001') // Primus fee
-});
-const receipt = await tx.wait();
-// Get taskId from VerificationRequested event
+const primus = new PrimusNetwork();
+await primus.init(wallet, 84532);
+
+const result = await primus.attest({
+  address: wallet.address,
+  userAddress: wallet.address,
+  taskId: taskId,
+  taskTxHash: tx.hash,
+  taskAttestors: ['0x0DE886e31723e64Aa72e51977B14475fB66a9f72'],
+  requests: [{
+    url: 'https://api.coinbase.com/v2/exchange-rates?currency=BTC',
+    method: 'GET',
+    header: '',
+    body: ''
+  }],
+  responseResolves: [[{  // Array of arrays!
+    keyName: 'btcPrice',
+    parseType: '',
+    parsePath: '$.data.rates.USD'
+  }]]
+}, 60000);
+
+const att = result[0].attestation;
+console.log('Attestation data:', att.data);
+console.log('Attestation timestamp:', att.timestamp);
 ```
 
-### Step 3: Wait for Callback
+### Step 4: Submit Attestation
 
-Primus will:
-1. Fetch the URL (e.g., Coinbase BTC price)
-2. Create zkTLS attestation
-3. Call back to PrimusVeritasApp
-4. Validate attestation
-5. Grant reputation
+```javascript
+const submitAbi = [
+  "function submitAttestation(bytes32 taskId, string calldata attestationUrl, string calldata attestationData, uint64 attestationTimestamp) external",
+  "function requests(bytes32) view returns (uint256 ruleId, uint256 agentId, address requester, bool completed)"
+];
 
-**This happens automatically - no action needed.**
+const submitter = new ethers.Contract(APP, submitAbi, wallet);
 
-### Step 4: Check Reputation
-
-```typescript
-const summary = await sdk.getReputationSummary(
-  agentId,
-  ['0xa70063A1970c9c10d0663610Fe7a02495548ba9b'] // Client addresses
+const tx = await submitter.submitAttestation(
+  taskId,
+  'https://api.coinbase.com/v2/exchange-rates?currency=BTC',
+  att.data,  // '{"btcPrice":"68164.45"}'
+  Math.floor(att.timestamp / 1000),  // Convert ms to seconds
+  { gasLimit: 500000 }
 );
-console.log(`Reputation: ${summary.averageValue} (count: ${summary.count})`);
+
+await tx.wait();
+console.log('Attestation submitted!');
+
+// Verify completion
+const req = await submitter.requests(taskId);
+console.log('Completed:', req.completed);
+console.log('Agent ID:', req.agentId.toString());
 ```
 
-## Complete Flow in One Call
+### Step 5: Check Reputation
 
-```typescript
-const { agentId, taskId } = await sdk.registerAndVerify(
-  "My Agent",
-  "AI trading assistant",
-  0  // Rule 0 = BTC price
+```javascript
+const REPUTATION_REGISTRY = '0x8004B663056A597Dffe9eCcC1965A193B7388713';
+
+// The ReputationRegistry emits FeedbackGiven event
+// Check transaction logs for the event
+
+const lastTx = await provider.getTransactionReceipt(tx.hash);
+const repLog = lastTx.logs.find(l => 
+  l.address.toLowerCase() === REPUTATION_REGISTRY.toLowerCase()
 );
+
+if (repLog) {
+  // Topic[1] contains agentId
+  const agentIdFromEvent = parseInt(repLog.topics[1], 16);
+  console.log('Reputation granted to agent:', agentIdFromEvent);
+}
 ```
 
 ## Common Patterns
 
-### Pattern 1: Multiple Verifications
+### Batch Verification
 
-```typescript
-// Register once
-const agentId = await sdk.registerIdentity("Multi-Verify Agent", "Tests multiple APIs");
-
-// Request multiple verifications
-await sdk.requestVerification(agentId, 0); // BTC price
-await sdk.requestVerification(agentId, 1); // ETH price
-```
-
-### Pattern 2: Check Before Request
-
-```typescript
-// Verify ownership first
-const isOwner = await sdk.isAgentOwner(agentId);
-if (!isOwner) {
-  throw new Error("Not the agent owner");
+```javascript
+async function verifyMultipleRules(agentId, ruleIds) {
+  const results = [];
+  
+  for (const ruleId of ruleIds) {
+    const result = await verifyAgent(agentId, ruleId);
+    results.push(result);
+  }
+  
+  return results;
 }
 
-// Then request
-await sdk.requestVerification(agentId, 0);
+// Verify both BTC and ETH prices
+await verifyMultipleRules(674, [2, 3]);
 ```
 
-### Pattern 3: Monitor Task Status
+### Check Before Requesting
 
-```typescript
-// After requestVerification, check Primus task
-const taskId = await sdk.requestVerification(agentId, 0);
-
-// Query Primus TaskContract (optional)
-const primusTask = new ethers.Contract(
-  '0xC02234058caEaA9416506eABf6Ef3122fCA939E8',
-  ['function queryTask(bytes32) view returns (tuple(string,address,address[],tuple(address,bytes32,tuple(address,bytes,bytes,string,uint64))[],uint64,uint8,address,uint8))'],
-  provider
-);
-
-const taskInfo = await primusTask.queryTask(taskId);
-console.log(`Status: ${taskInfo.taskStatus}`); // 0=INIT, 1=SUCCESS, etc.
-```
-
-## Error Handling
-
-### "Not agent owner"
-```
-Cause: msg.sender != ownerOf(agentId)
-Fix: Use the wallet that registered the agent
+```javascript
+async function safeRequest(agentId, ruleId) {
+  // Check ownership
+  const owner = await identity.ownerOf(agentId);
+  if (owner.toLowerCase() !== wallet.address.toLowerCase()) {
+    throw new Error('Not agent owner');
+  }
+  
+  // Check rule is active
+  const rule = await app.rules(ruleId);
+  if (!rule.active) {
+    throw new Error('Rule not active');
+  }
+  
+  // Proceed with request
+  return app.requestVerification(ruleId, agentId, { value: FEE });
+}
 ```
 
-### "Rule inactive"
-```
-Cause: Verification rule is disabled
-Fix: Use a different ruleId
+### Retry Logic
+
+```javascript
+async function attestWithRetry(taskId, txHash, maxRetries = 3) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await primus.attest({ taskId, taskTxHash: txHash, ... }, 60000);
+    } catch (e) {
+      if (i === maxRetries - 1) throw e;
+      await new Promise(r => setTimeout(r, 5000));  // Wait 5s
+    }
+  }
+}
 ```
 
-### "Paying Fee is not correct"
-```
-Cause: Wrong ETH amount sent
-Fix: Send exactly 0.00000001 ETH
+## Troubleshooting
+
+### Issue: "Not agent owner"
+
+**Cause:** Wallet doesn't own the agent NFT
+
+**Solution:**
+```javascript
+const owner = await identity.ownerOf(agentId);
+console.log('Agent owner:', owner);
+console.log('Your wallet:', wallet.address);
 ```
 
-### "Already validated"
+### Issue: "Paying Fee is not correct"
+
+**Cause:** Wrong fee amount
+
+**Solution:**
+```javascript
+const FEE = ethers.BigNumber.from('10000000000');  // Exactly 10^10 wei
+// NOT: ethers.utils.parseEther('0.00000001')  // May have precision issues
 ```
-Cause: TaskId already used
-Fix: Each verification request gets unique taskId
+
+### Issue: "subArr.map is not a function"
+
+**Cause:** Wrong responseResolves format
+
+**Solution:**
+```javascript
+// WRONG
+responseResolves: [{ keyName: 'btcPrice', ... }]
+
+// CORRECT
+responseResolves: [[{ keyName: 'btcPrice', ... }]]
 ```
+
+### Issue: "Data key not found"
+
+**Cause:** Rule's dataKey doesn't match SDK's keyName
+
+**Solution:**
+```javascript
+// Rule must have:
+dataKey: 'btcPrice'
+
+// SDK must have:
+responseResolves: [[{ keyName: 'btcPrice', ... }]]
+```
+
+## Transaction Examples
+
+### Successful Verification
+
+| Step | Tx Hash |
+|------|---------|
+| Request | [0x1f6625bc...](https://sepolia.basescan.org/tx/0x1f6625bc1d7082805b79701a2726d69066cf2f583ccd4b4bda5d04528f732e9a) |
+| Submit | [0x8a6741e7...](https://sepolia.basescan.org/tx/0x8a6741e799b5dd04bb6e6945a2f6f15d72041749ca30ac3ea7391d1ee4a159fa) |
+
+**Result:** Agent 674 earned 100 reputation points.
+
+## Best Practices
+
+1. **Verify ownership first** - Check `ownerOf(agentId)`
+2. **Use exact fee** - `BigNumber.from('10000000000')`
+3. **Match dataKey to keyName** - Rule and SDK must align
+4. **Convert timestamps** - SDK ms → contract seconds
+5. **Check completed status** - Avoid duplicate processing
+6. **Handle timeouts** - SDK may take 30-60 seconds
+7. **Log task IDs** - For debugging and tracking

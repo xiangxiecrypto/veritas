@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "./IVeritasApp.sol";
-import "./VeritasValidationRegistry.sol";
+import "./VeritasValidationRegistryV2.sol";
 import "./PrimusTaskInterface.sol";
 
 /**
@@ -24,10 +24,10 @@ interface IIdentityRegistry {
  * @dev Uses callback pattern - Primus calls back when attestation is ready
  * @dev Only registered agents (ERC-8004) can build reputation
  */
-contract PrimusVeritasApp is IVeritasApp {
+contract PrimusVeritasAppV2 is IVeritasApp {
     address public owner;
     IPrimusTaskContract public immutable primusTask;
-    VeritasValidationRegistry public immutable registry;
+    VeritasValidationRegistryV2 public immutable registry;
     IIdentityRegistry public immutable identityRegistry;
     
     struct VerificationRule {
@@ -74,7 +74,7 @@ contract PrimusVeritasApp is IVeritasApp {
     ) {
         owner = msg.sender;
         primusTask = IPrimusTaskContract(_primusTask);
-        registry = VeritasValidationRegistry(_registry);
+        registry = VeritasValidationRegistryV2(_registry);
         reputationRegistry = _reputationRegistry;
         identityRegistry = IIdentityRegistry(_identityRegistry);
     }
@@ -160,6 +160,61 @@ contract PrimusVeritasApp is IVeritasApp {
     }
     
     // ============================================
+    // WITHDRAW - Trigger callback by settling task
+    // ============================================
+    
+    /**
+     * @notice Withdraw balance and trigger callbacks for completed tasks
+     * @dev Primus only triggers callback during withdrawBalance()
+     * @param tokenSymbol Token to withdraw
+     * @param limit Maximum number of tasks to settle
+     */
+    function withdrawAndSettle(uint8 tokenSymbol, uint256 limit) external {
+        // This calls withdrawBalance which triggers callbacks
+        primusTask.withdrawBalance(TokenSymbol.ETH, limit);
+    }
+    
+    /**
+     * @notice Withdraw for a specific task
+     * @dev Calls withdrawBalance with limit=1 for a specific task
+     */
+    function withdrawForTask(bytes32 taskId) external {
+        // Only allow withdrawing for our own tasks
+        require(requests[taskId].requester != address(0), "Not our task");
+        primusTask.withdrawBalance(TokenSymbol.ETH, 1);
+    }
+    
+    /**
+     * @notice Settle a verification request to trigger the callback
+     * @dev Primus only triggers callback during withdrawBalance()
+     * @param taskId The task ID to settle
+     */
+    function settleVerification(bytes32 taskId) external {
+        VerificationRequest storage req = requests[taskId];
+        require(req.requester != address(0), "Request not found");
+        require(!req.completed, "Already completed");
+        
+        // Call withdrawBalance on Primus to settle the task
+        // This will trigger the callback to onAttestationComplete
+        primusTask.withdrawBalance(TokenSymbol.ETH, 1);
+    }
+    
+    /**
+     * @notice Batch settle multiple verification requests
+     * @param taskIds Array of task IDs to settle
+     */
+    function settleVerificationBatch(bytes32[] calldata taskIds) external {
+        for (uint256 i = 0; i < taskIds.length; i++) {
+            VerificationRequest storage req = requests[taskIds[i]];
+            if (req.requester != address(0) && !req.completed) {
+                // Just check, don't require
+            }
+        }
+        // Withdraw all pending tasks
+        primusTask.withdrawBalance(TokenSymbol.ETH, 100);
+    }
+    
+    // ============================================
     // CALLBACK - Called by Primus when attestation is ready
     // ============================================
     
@@ -190,29 +245,87 @@ contract PrimusVeritasApp is IVeritasApp {
         string memory attestationUrl = _decodeRequestUrl(att.request);
         
         // Validate and grant reputation via Registry
-        // This will:
-        // 1. Check URL matches
-        // 2. Check data key exists
-        // 3. Check recipient matches
-        // 4. Check freshness
-        // 5. Call customCheck
-        // 6. Grant reputation
-        registry.validateAttestation(
-            req.agentId,
-            taskId,
-            address(this),
-            req.ruleId,
-            attestationUrl,
-            att.data,
-            att.timestamp,
-            att.recipient,
-            rule.urlHash,
-            rule.dataKey,
-            rule.score,
-            rule.decimals,
-            rule.maxAge,
-            reputationRegistry
+        VeritasValidationRegistryV2.ValidationParams memory params = VeritasValidationRegistryV2.ValidationParams({
+            agentId: req.agentId,
+            taskId: taskId,
+            appContract: address(this),
+            ruleId: req.ruleId,
+            attestationUrl: attestationUrl,
+            attestationData: att.data,
+            attestationTimestamp: att.timestamp,
+            expectedUrlHash: rule.urlHash,
+            expectedDataKey: rule.dataKey,
+            score: rule.score,
+            decimals: rule.decimals,
+            maxAge: rule.maxAge,
+            reputationRegistry: reputationRegistry
+        });
+        registry.validateAttestation(params);
+        
+        // Mark completed
+        req.completed = true;
+        
+        emit VerificationCompleted(taskId, req.agentId, rule.score);
+    }
+    
+    /**
+     * @notice Submit attestation directly (for SDK integration)
+     * @dev Called by anyone after SDK.attest() completes
+     * @dev Queries Primus to verify attestation is real
+     */
+    function submitAttestation(
+        bytes32 taskId,
+        string calldata attestationUrl,
+        string calldata attestationData,
+        uint64 attestationTimestamp
+    ) external {
+        VerificationRequest storage req = requests[taskId];
+        require(!req.completed, "Already completed");
+        require(req.requester != address(0), "Request not found");
+        
+        // Query Primus to verify attestation exists and matches
+        TaskInfo memory taskInfo = primusTask.queryTask(taskId);
+        require(taskInfo.taskStatus == 1, "Task not completed");
+        require(taskInfo.callback == address(this), "Not our task");
+        require(taskInfo.taskResults.length > 0, "No attestation");
+        
+        // Verify the attestation data matches
+        TaskResult memory result = taskInfo.taskResults[0];
+        Attestation memory att = result.attestation;
+        
+        // Verify URL matches (use templateId, not att.request)
+        require(
+            keccak256(bytes(taskInfo.templateId)) == keccak256(bytes(attestationUrl)),
+            "URL mismatch"
         );
+        
+        // Verify data matches
+        require(
+            keccak256(bytes(att.data)) == keccak256(bytes(attestationData)),
+            "Data mismatch"
+        );
+        
+        // Get rule
+        VerificationRule memory rule = rules[req.ruleId];
+        require(rule.active, "Rule inactive");
+        
+        // Validate and grant reputation via Registry
+        VeritasValidationRegistryV2.ValidationParams memory params = VeritasValidationRegistryV2.ValidationParams({
+            agentId: req.agentId,
+            taskId: taskId,
+            appContract: address(this),
+            ruleId: req.ruleId,
+            attestationUrl: attestationUrl,
+            attestationData: attestationData,
+            attestationTimestamp: attestationTimestamp,
+            expectedUrlHash: rule.urlHash,
+            expectedDataKey: rule.dataKey,
+            score: rule.score,
+            decimals: rule.decimals,
+            maxAge: rule.maxAge,
+            reputationRegistry: reputationRegistry
+        });
+        registry.validateAttestation(params);
         
         // Mark completed
         req.completed = true;
@@ -244,23 +357,23 @@ contract PrimusVeritasApp is IVeritasApp {
         
         VerificationRule memory rule = rules[req.ruleId];
         require(rule.active, "Rule inactive");
-        
-        registry.validateAttestation(
-            req.agentId,
-            taskId,
-            address(this),
-            req.ruleId,
-            attestationUrl,
-            att.data,
-            att.timestamp,
-            att.recipient,
-            rule.urlHash,
-            rule.dataKey,
-            rule.score,
-            rule.decimals,
-            rule.maxAge,
-            reputationRegistry
-        );
+
+        VeritasValidationRegistryV2.ValidationParams memory params = VeritasValidationRegistryV2.ValidationParams({
+            agentId: req.agentId,
+            taskId: taskId,
+            appContract: address(this),
+            ruleId: req.ruleId,
+            attestationUrl: attestationUrl,
+            attestationData: att.data,
+            attestationTimestamp: att.timestamp,
+            expectedUrlHash: rule.urlHash,
+            expectedDataKey: rule.dataKey,
+            score: rule.score,
+            decimals: rule.decimals,
+            maxAge: rule.maxAge,
+            reputationRegistry: reputationRegistry
+        });
+        registry.validateAttestation(params);
         
         req.completed = true;
         

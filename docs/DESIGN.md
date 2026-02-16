@@ -1,92 +1,159 @@
-# Product Design
+# Design
 
-## What is Veritas?
+## Product Vision
 
-Veritas is a trust infrastructure for AI agents. It provides **on-chain identity** and **verifiable reputation** using ERC-8004 and Primus zkTLS attestations.
+**Veritas Protocol** enables AI agents to build verifiable, on-chain reputation through cryptographic proofs.
 
-## Why Veritas?
+### Problem
+- AI agents operate without verifiable credentials
+- No way to prove an agent actually performed an action
+- Reputation systems rely on trust, not proof
 
-AI agents are becoming autonomous actors in digital systems. They make decisions, execute transactions, and interact with users. But how do you **trust** an AI agent?
-
-Traditional approaches:
-- Centralized reputation systems (opaque, manipulable)
-- Manual verification (slow, unscalable)
-- No on-chain proof (not composable)
-
-Veritas solves this by:
-1. **Permanent Identity**: ERC-8004 registration creates immutable agent identity
-2. **Verifiable Proof**: Primus zkTLS provides cryptographic attestation
-3. **On-chain Reputation**: Transparent, composable reputation scores
+### Solution
+- **ERC-8004 Identity**: Each agent has a unique on-chain identity
+- **zkTLS Attestation**: Cryptographic proof of HTTPS requests
+- **On-chain Reputation**: Immutable record of verified actions
 
 ## Core Concepts
 
 ### Agent Identity (ERC-8004)
+Every agent is represented as an NFT in IdentityRegistry:
+- Unique `agentId` (NFT token ID)
+- Owner address (the human/entity controlling the agent)
+- Metadata (name, description, capabilities)
 
-Every agent gets a unique `agentId` through ERC-8004 registration:
-
-```
-Agent Owner → IdentityRegistry.register(metadata) → agentId
-```
-
-The agent becomes an NFT with:
-- Permanent on-chain identity
-- Owner-controlled metadata
-- Transferable ownership
-
-### Reputation Building
-
-Agents build reputation through **attestations** - cryptographic proofs of real-world actions:
-
-```
-Agent Owner → requestVerification(agentId, ruleId) → Primus attests → Reputation granted
+### Verification Rules
+Rules define what constitutes valid proof:
+```solidity
+struct VerificationRule {
+    string url;          // Target URL (e.g., Coinbase API)
+    string dataKey;      // JSON key to extract (e.g., "btcPrice")
+    int128 score;        // Reputation points for success
+    uint256 maxAge;      // Time limit for attestation freshness
+}
 ```
 
-Current verification rules:
-- **BTC Price Fetch**: Proves agent can fetch live BTC/USD price
-- **ETH Price Fetch**: Proves agent can fetch live ETH/USD price
+### Attestation
+Primus Network provides zkTLS attestations:
+1. Attestor makes HTTPS request to target URL
+2. Generates zero-knowledge proof of TLS response
+3. Signs attestation cryptographically
+4. Result stored on-chain in Primus TaskContract
 
-Future rules can verify:
-- API access capabilities
-- Social media presence
-- Account ownership
-- Any web-accessible data
+### Reputation
+When attestation is validated:
+- `ReputationRegistry.giveFeedback(agentId, score)` is called
+- Agent's total score increases
+- Feedback record stored with proof data
 
 ## Use Cases
 
-### 1. Autonomous Trading Agents
-Prove the agent can reliably fetch market data and execute trades.
+### 1. Oracle Verification
+**Prove an agent can fetch real market data:**
+- Rule: Fetch BTC/USD from Coinbase
+- Attestation proves agent accessed real API
+- Reputation: 100 points
 
-### 2. AI Oracles
-Verify an AI agent's ability to fetch and validate external data.
+### 2. API Access Verification
+**Prove an agent has valid API credentials:**
+- Rule: Fetch user data from protected endpoint
+- Attestation proves successful authenticated request
+- Reputation: Variable based on API sensitivity
 
-### 3. Agent Marketplaces
-Trust score helps users choose reliable agents for tasks.
+### 3. Content Verification
+**Prove content existed at a point in time:**
+- Rule: Fetch article from news site
+- Attestation includes content hash
+- Reputation: Based on content type
 
-### 4. DeFi Protocols
-Agents with high reputation can participate in governance or execute privileged actions.
+### 4. Compliance Verification
+**Prove regulatory requirements met:**
+- Rule: Fetch compliance certificate
+- Attestation proves valid certificate
+- Reputation: Compliance score
 
 ## Security Model
 
-```
-┌─────────────────────────────────────────────────────────┐
-│  REQUIREMENT 1: Agent must be registered                │
-│  → identityRegistry.ownerOf(agentId) succeeds           │
-├─────────────────────────────────────────────────────────┤
-│  REQUIREMENT 2: Caller must be the agent owner          │
-│  → msg.sender == ownerOf(agentId)                       │
-├─────────────────────────────────────────────────────────┤
-│  REQUIREMENT 3: Attestation must be valid               │
-│  → Primus zkTLS verification                            │
-│  → URL matches rule                                     │
-│  → Data key exists                                      │
-│  → Timestamp is fresh                                   │
-└─────────────────────────────────────────────────────────┘
+### Threat Model
+| Threat | Mitigation |
+|--------|------------|
+| Fake attestation | zkTLS cryptographic proof |
+| Replay attacks | taskId tracked as used |
+| Stale data | maxAge freshness check |
+| Wrong agent | ERC-8004 ownership verification |
+| Wrong URL | keccak256 hash verification |
+
+### Trust Assumptions
+1. **Primus Network**: Trusted to generate valid zkTLS proofs
+2. **IdentityRegistry**: Trusted for agent ownership
+3. **Attestor**: Single attestor (can be expanded)
+
+### Permission Model
+- **Agent Owner**: Can request verification for their agents
+- **Anyone**: Can call `submitAttestation()` with valid proof
+- **Contract Owner**: Can add/update rules
+
+## Economics
+
+### Fee Structure
+- User pays Primus fee: 0.00000001 ETH (10^10 wei)
+- No protocol fees currently
+- Gas costs: ~630,000 gas per verification
+
+### Reputation Scoring
+- Scores are signed integers (can be negative)
+- Decimals supported for precision
+- Scores accumulate over time
+- Future: Decay mechanisms possible
+
+## Extensibility
+
+### Custom Rules
+New rules can be added for any HTTPS endpoint:
+```solidity
+app.addRule(
+    "https://api.example.com/data",
+    "value",     // JSON key
+    50,          // score
+    2,           // decimals
+    3600,        // maxAge (1 hour)
+    "Description"
+);
 ```
 
-## Design Principles
+### Custom Validation
+Apps can implement `customCheck()` for additional validation:
+```solidity
+function customCheck(
+    uint256 ruleId,
+    string calldata url,
+    string calldata data,
+    uint64 timestamp
+) external override returns (bool) {
+    // Custom logic here
+    return true;
+}
+```
 
-1. **Simplicity**: Two-step flow (Register → Verify)
-2. **Security**: Only agent owner can build reputation
-3. **Transparency**: All reputation on-chain
-4. **Composability**: ERC-8004 compatible with existing tools
-5. **Extensibility**: New verification rules can be added
+### Multiple Attestors
+Currently single attestor, can expand:
+- Multi-attestor consensus
+- Attestor reputation
+- Slashing mechanisms
+
+## Future Roadmap
+
+### Phase 1 (Current)
+- ✅ Basic verification flow
+- ✅ Coinbase price feeds
+- ✅ SDK integration
+
+### Phase 2
+- [ ] Multiple attestors
+- [ ] More data sources
+- [ ] Reputation decay
+
+### Phase 3
+- [ ] Cross-chain verification
+- [ ] Agent discovery
+- [ ] Reputation marketplace
