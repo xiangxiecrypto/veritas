@@ -62,9 +62,15 @@ const result = await primus.attest({
 await app.submitAttestation(taskId, url, result[0].attestation.data, timestamp);
 ```
 
+## Current Limitation
+
+⚠️ **No auto-callback from Primus** - Currently requires manual `submitAttestation()` after SDK.attest().
+
+**Future improvement:** Auto-callback from Primus after attestation completion (no manual step needed).
+
 ## Critical Details
 
-1. **Primus doesn't auto-callback** - Must call `submitAttestation()` manually
+1. **Manual submission required** - Call `submitAttestation()` after SDK.attest()
 2. **SDK responseResolves** must be `[[{...}]]` (array of arrays)
 3. **URL is in `taskInfo.templateId`**, not `attestation.request`
 4. **dataKey must match SDK keyName** (e.g., `"btcPrice"`)

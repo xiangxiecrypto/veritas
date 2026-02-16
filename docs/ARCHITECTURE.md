@@ -120,10 +120,12 @@ require(_containsDataKey(data, key), "Data key not found");
 
 ## Key Design Decisions
 
-### 1. SDK Integration (Not Auto-Callback)
-Primus does NOT automatically call back to contracts. The SDK handles attestation off-chain, then we manually submit to our contract.
+### 1. Manual Attestation Submission (Current)
+Currently, Primus does NOT automatically call back to contracts after `SDK.attest()` completes. We manually submit attestation data via `submitAttestation()`.
 
-**Why?** Primus TaskContract doesn't have callback mechanisms in bytecode.
+**Why?** Primus testnet callback mechanism not yet confirmed. Will be improved.
+
+**Future:** Auto-callback from Primus after attestation completion (no manual step).
 
 ### 2. Callback Address is Informational
 The `callback` parameter in `submitTask()` is stored but not used by Primus. We use `queryTask()` to verify instead.
