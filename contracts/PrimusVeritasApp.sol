@@ -184,6 +184,15 @@ contract PrimusVeritasApp {
             address(this)         // ← CALLBACK: this contract receives the result
         );
         
+        // Register validation request with ERC-8004 ValidationRegistry
+        // This contract acts as the validator
+        registry.validationRequest(
+            address(this),      // validatorAddress (this contract validates)
+            agentId,            // agentId being validated
+            rule.templateId,    // requestURI (URL for attestation data)
+            taskId              // requestHash (unique identifier)
+        );
+        
         // Store pending validation details
         PendingValidation storage pending = pendingValidations[taskId];
         pending.ruleId = ruleId;
@@ -299,13 +308,14 @@ contract PrimusVeritasApp {
             ? uint8((uint256(int256(totalScore)) * 100) / uint256(int256(maxScore)))
             : 0;
         
-        // Store result in Registry (best effort - don't revert if registry fails)
+        // Store result in Registry (ERC-8004 compliant)
+        // responseURI points to attestation data, responseHash is its commitment
         try registry.validationResponse(
-            taskId,
-            response,
-            _toHexString(taskId),
-            keccak256(bytes(taskResult.attestation.data)),
-            rule.description
+            taskId,                                           // requestHash
+            response,                                         // response (0-100 score)
+            rule.templateId,                                  // responseURI (URL used for attestation)
+            keccak256(bytes(taskResult.attestation.data)),   // responseHash (commitment to data)
+            rule.description                                  // tag (description of validation)
         ) {
             // Registry call succeeded
         } catch {
@@ -392,7 +402,7 @@ contract PrimusVeritasApp {
         registry.validationResponse(
             taskId,
             response,
-            _toHexString(taskId),
+            rule.templateId,
             keccak256(bytes(attestationData)),
             rule.description
         );
