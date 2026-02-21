@@ -15,7 +15,7 @@ const { PrimusNetwork } = require('@primuslabs/network-core-sdk');
 // Configuration
 const CHAIN_ID = 84532; // Base Sepolia
 const EXPLORER = 'https://sepolia.basescan.org';
-const REGISTRY = '0x257DC4B38066840769EeA370204AD3724ddb0836';
+const REGISTRY = '0x257DC4B38066840769EeA370204AD3724ddb0836'; // VeritasValidationRegistry
 const PRIMUS_TASK = '0xC02234058caEaA9416506eABf6Ef3122fCA939E8';
 
 // TaskContract ABI (minimal)
@@ -37,12 +37,12 @@ async function main() {
   console.log('📦 Step 1: Deploy Contracts');
   console.log('─────────────────────────────────────────────────────────────');
   
-  const App = await ethers.getContractFactory("PrimusVeritasAppV5");
+  const App = await ethers.getContractFactory("PrimusVeritasApp");
   const app = await App.deploy(REGISTRY, PRIMUS_TASK);
   await app.deployed();
   console.log('✅ App deployed:', app.address);
 
-  const PriceCheck = await ethers.getContractFactory("PriceRangeCheckV2");
+  const PriceCheck = await ethers.getContractFactory("PriceRangeCheck");
   const priceCheck = await PriceCheck.deploy();
   await priceCheck.deployed();
 

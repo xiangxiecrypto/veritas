@@ -1,125 +1,100 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
-
-import "../ICustomCheck.sol";
+pragma solidity ^0.8.20;
 
 /**
- * @title PriceRangeCheck
- * @notice Validates that a price/value is within a specified range
- * @dev Params: abi.encode(int128 minPrice, int128 maxPrice)
- *      Values should be scaled by 10^decimals (e.g., 6816445 for $68164.45 with 2 decimals)
+ * @title PriceRangeCheckV2
+ * @notice Validates that a price value is within a specified range
+ * @dev Designed to work with Primus SDK - receives pre-extracted values, NOT JSON
+ * 
+ * IMPORTANT: This contract receives the extracted value directly from the attestation.
+ * The JSON parsing happens in the Primus SDK using JSONPath expressions like:
+ *   $.data[0].last
+ * 
+ * The attestation.data will contain the extracted value as a string, e.g., "67000.5"
  */
-contract PriceRangeCheck is ICustomCheck {
-    
-    struct Params {
-        int128 minPrice;
-        int128 maxPrice;
+contract PriceRangeCheckV2 {
+    struct RangeParams {
+        int128 minPrice;    // Minimum acceptable price (in smallest unit, e.g., cents)
+        int128 maxPrice;    // Maximum acceptable price (in smallest unit, e.g., cents)
     }
-    
+
     /**
-     * @notice Check if value is within [minPrice, maxPrice]
+     * @notice Validate that the attested price value is within range
+     * @param dataKey The key name from responseResolves (e.g., "btcPrice")
+     * @param attestationValue The extracted value from attestation (e.g., "67000.5")
+     * @param params Encoded RangeParams (minPrice, maxPrice)
+     * @return passed Whether validation passed
+     * @return value The extracted price value
      */
     function validate(
         string calldata dataKey,
-        string calldata attestationData,
+        string calldata attestationValue,
         bytes calldata params
-    ) external pure override returns (bool passed, int128 actualValue) {
-        // Decode params
-        Params memory p = abi.decode(params, (Params));
+    ) external pure returns (bool passed, int128 value) {
+        RangeParams memory range = abi.decode(params, (RangeParams));
         
-        // Extract value from JSON
-        actualValue = _extractValue(attestationData, dataKey);
+        // Parse the attestation value (string like "67000.5") to int128
+        value = _parsePrice(attestationValue);
         
-        // Check range (inclusive)
-        passed = (actualValue >= p.minPrice && actualValue <= p.maxPrice);
+        // Check if within range
+        passed = (value >= range.minPrice && value <= range.maxPrice);
     }
-    
+
     /**
-     * @notice Extract numeric value from JSON string
-     * @dev Parses format: {"key":"value"} where value is a number
-     *      Returns value scaled by 100 (2 decimal places)
+     * @notice Parse a price string to int128 (in cents)
+     * @param priceStr The price as a string (e.g., "67000.5" or "67000")
+     * @return The price in cents (e.g., 6700050)
      */
-    function _extractValue(string memory data, string memory key) internal pure returns (int128) {
-        bytes memory dataBytes = bytes(data);
-        bytes memory keyBytes = bytes(key);
+    function _parsePrice(string calldata priceStr) internal pure returns (int128) {
+        bytes memory strBytes = bytes(priceStr);
+        uint256 len = strBytes.length;
         
-        // Build search pattern: "key":"
-        bytes memory searchPattern = abi.encodePacked('"', keyBytes, '":"');
+        if (len == 0) return 0;
         
-        if (dataBytes.length < searchPattern.length) {
-            return 0;
-        }
-        
-        // Find the key
-        uint256 valueStart = 0;
-        for (uint256 i = 0; i <= dataBytes.length - searchPattern.length; i++) {
-            bool found = true;
-            for (uint256 j = 0; j < searchPattern.length; j++) {
-                if (dataBytes[i + j] != searchPattern[j]) {
-                    found = false;
-                    break;
-                }
-            }
-            if (found) {
-                valueStart = i + searchPattern.length;
-                break;
-            }
-        }
-        
-        if (valueStart == 0) {
-            return 0;
-        }
-        
-        // Find the closing quote
-        uint256 valueEnd = valueStart;
-        while (valueEnd < dataBytes.length && dataBytes[valueEnd] != '"') {
-            valueEnd++;
-        }
-        
-        // Extract value string
-        bytes memory valueBytes = new bytes(valueEnd - valueStart);
-        for (uint256 i = 0; i < valueBytes.length; i++) {
-            valueBytes[i] = dataBytes[valueStart + i];
-        }
-        
-        // Parse to int128 (scaled by 100 for 2 decimals)
-        return _parseInt128(string(valueBytes));
-    }
-    
-    /**
-     * @notice Parse string to int128, handling decimals
-     * @dev "68164.45" -> 6816445 (scaled by 100)
-     */
-    function _parseInt128(string memory s) internal pure returns (int128) {
-        bytes memory b = bytes(s);
         int128 result = 0;
         bool negative = false;
+        bool hasDecimal = false;
+        uint256 decimalPlaces = 0;
         uint256 i = 0;
         
-        if (b.length > 0 && b[0] == '-') {
+        // Handle negative sign
+        if (strBytes[0] == '-') {
             negative = true;
             i = 1;
         }
         
-        // Parse integer part
-        while (i < b.length && b[i] >= '0' && b[i] <= '9') {
-            result = result * 10 + int128(int8(uint8(b[i]) - 48));
+        // Parse digits
+        while (i < len) {
+            bytes1 char = strBytes[i];
+            
+            if (char >= '0' && char <= '9') {
+                uint8 digit = uint8(char) - 48;
+                result = result * 10 + int128(int256(uint256(digit)));
+                if (hasDecimal) {
+                    decimalPlaces++;
+                }
+            } else if (char == '.') {
+                hasDecimal = true;
+            }
+            // Ignore other characters (like quotes, commas, etc.)
             i++;
         }
         
-        // Parse decimal part (2 decimals)
-        if (i < b.length && b[i] == '.') {
-            i++;
-            int128 decimal = 0;
-            int128 multiplier = 10;
-            while (i < b.length && b[i] >= '0' && b[i] <= '9' && multiplier > 0) {
-                decimal = decimal * 10 + int128(int8(uint8(b[i]) - 48));
-                i++;
-            }
-            result = result * 100 + decimal;
-        } else {
-            // No decimal point - still scale by 100
+        // Convert to cents (2 decimal places)
+        if (decimalPlaces == 0) {
+            // No decimal: "67000" -> 6700000 cents
             result = result * 100;
+        } else if (decimalPlaces == 1) {
+            // One decimal: "67000.5" -> 6700050 cents (already correct)
+            result = result * 10;
+        } else if (decimalPlaces == 2) {
+            // Two decimals: "67000.50" -> 6700050 cents (already correct)
+            // No change needed
+        } else {
+            // More than 2 decimals: truncate
+            for (uint256 j = 2; j < decimalPlaces; j++) {
+                result = result / 10;
+            }
         }
         
         return negative ? -result : result;

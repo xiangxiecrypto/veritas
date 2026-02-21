@@ -1,106 +1,107 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
-
-import "../ICustomCheck.sol";
+pragma solidity ^0.8.20;
 
 /**
- * @title ThresholdCheck
- * @notice Validates that a value exceeds a threshold
- * @dev Params: abi.encode(int128 threshold, bool greaterThanOrEqual)
- *      greaterThanOrEqual: true means >=, false means >
+ * @title ThresholdCheckV2
+ * @notice Validates that a value doesn't exceed a threshold percentage from expected
+ * @dev Designed to work with Primus SDK - receives pre-extracted values, NOT JSON
+ * 
+ * IMPORTANT: This contract receives the extracted value directly from the attestation.
+ * The JSON parsing happens in the Primus SDK using JSONPath expressions.
  */
-contract ThresholdCheck is ICustomCheck {
-    
-    struct Params {
-        int128 threshold;
-        bool greaterThanOrEqual;  // true: >=, false: >
+contract ThresholdCheckV2 {
+    struct ThresholdParams {
+        int128 expectedValue;   // The expected/reference value (in smallest unit)
+        int128 maxDeviationBps; // Maximum allowed deviation (in basis points, 500 = 5%)
     }
-    
+
     /**
-     * @notice Check if value meets threshold
+     * @notice Validate that the attested value is within threshold of expected
+     * @param dataKey The key name from responseResolves (e.g., "ethPrice")
+     * @param attestationValue The extracted value from attestation (e.g., "3500.5")
+     * @param params Encoded ThresholdParams
+     * @return passed Whether validation passed
+     * @return value The extracted value
      */
     function validate(
         string calldata dataKey,
-        string calldata attestationData,
+        string calldata attestationValue,
         bytes calldata params
-    ) external pure override returns (bool passed, int128 actualValue) {
-        Params memory p = abi.decode(params, (Params));
+    ) external pure returns (bool passed, int128 value) {
+        ThresholdParams memory threshold = abi.decode(params, (ThresholdParams));
         
-        // Extract value from JSON
-        actualValue = _extractValue(attestationData, dataKey);
+        // Parse the attestation value (string) to int128
+        value = _parsePrice(attestationValue);
         
-        // Check threshold
-        if (p.greaterThanOrEqual) {
-            passed = actualValue >= p.threshold;
+        if (threshold.expectedValue == 0) {
+            passed = (value == 0);
         } else {
-            passed = actualValue > p.threshold;
-        }
-    }
-    
-    function _extractValue(string memory data, string memory key) internal pure returns (int128) {
-        bytes memory dataBytes = bytes(data);
-        bytes memory keyBytes = bytes(key);
-        
-        bytes memory searchPattern = abi.encodePacked('"', keyBytes, '":"');
-        
-        if (dataBytes.length < searchPattern.length) return 0;
-        
-        uint256 valueStart = 0;
-        for (uint256 i = 0; i <= dataBytes.length - searchPattern.length; i++) {
-            bool found = true;
-            for (uint256 j = 0; j < searchPattern.length; j++) {
-                if (dataBytes[i + j] != searchPattern[j]) {
-                    found = false;
-                    break;
-                }
-            }
-            if (found) {
-                valueStart = i + searchPattern.length;
-                break;
+            // Calculate absolute difference
+            int128 diff = value > threshold.expectedValue 
+                ? value - threshold.expectedValue 
+                : threshold.expectedValue - value;
+            
+            // Calculate deviation in basis points (10000 = 100%)
+            int128 absExpected = threshold.expectedValue >= 0 
+                ? threshold.expectedValue 
+                : -threshold.expectedValue;
+            
+            // Prevent division by zero
+            if (absExpected == 0) {
+                passed = (value == 0);
+            } else {
+                int128 deviationBps = (diff * 10000) / absExpected;
+                passed = (deviationBps <= threshold.maxDeviationBps);
             }
         }
-        
-        if (valueStart == 0) return 0;
-        
-        uint256 valueEnd = valueStart;
-        while (valueEnd < dataBytes.length && dataBytes[valueEnd] != '"') {
-            valueEnd++;
-        }
-        
-        bytes memory valueBytes = new bytes(valueEnd - valueStart);
-        for (uint256 i = 0; i < valueBytes.length; i++) {
-            valueBytes[i] = dataBytes[valueStart + i];
-        }
-        
-        return _parseInt128(string(valueBytes));
     }
-    
-    function _parseInt128(string memory s) internal pure returns (int128) {
-        bytes memory b = bytes(s);
+
+    /**
+     * @notice Parse a price string to int128 (in cents)
+     * @param priceStr The price as a string (e.g., "3500.5")
+     * @return The price in cents (e.g., 350050)
+     */
+    function _parsePrice(string calldata priceStr) internal pure returns (int128) {
+        bytes memory strBytes = bytes(priceStr);
+        uint256 len = strBytes.length;
+        
+        if (len == 0) return 0;
+        
         int128 result = 0;
         bool negative = false;
+        bool hasDecimal = false;
+        uint256 decimalPlaces = 0;
         uint256 i = 0;
         
-        if (b.length > 0 && b[0] == '-') {
+        if (strBytes[0] == '-') {
             negative = true;
             i = 1;
         }
         
-        while (i < b.length && b[i] >= '0' && b[i] <= '9') {
-            result = result * 10 + int128(int8(uint8(b[i]) - 48));
+        while (i < len) {
+            bytes1 char = strBytes[i];
+            
+            if (char >= '0' && char <= '9') {
+                uint8 digit = uint8(char) - 48;
+                result = result * 10 + int128(int256(uint256(digit)));
+                if (hasDecimal) {
+                    decimalPlaces++;
+                }
+            } else if (char == '.') {
+                hasDecimal = true;
+            }
             i++;
         }
         
-        if (i < b.length && b[i] == '.') {
-            i++;
-            int128 decimal = 0;
-            while (i < b.length && b[i] >= '0' && b[i] <= '9') {
-                decimal = decimal * 10 + int128(int8(uint8(b[i]) - 48));
-                i++;
-            }
-            result = result * 100 + decimal;
-        } else {
+        // Convert to cents (2 decimal places)
+        if (decimalPlaces == 0) {
             result = result * 100;
+        } else if (decimalPlaces == 1) {
+            result = result * 10;
+        } else if (decimalPlaces > 2) {
+            for (uint256 j = 2; j < decimalPlaces; j++) {
+                result = result / 10;
+            }
         }
         
         return negative ? -result : result;

@@ -34,8 +34,8 @@ The Primus SDK's `PrimusNetwork.submitTask()` has a bug where `callbackAddress` 
 
 | File | Purpose |
 |------|---------|
-| `PrimusVeritasAppV5.sol` | Main contract with auto-callback support |
-| `VeritasValidationRegistryV4.sol` | Stores validation results |
+| `PrimusVeritasApp.sol` | Main contract with auto-callback support |
+| `VeritasValidationRegistry.sol` | Stores validation results |
 | `IPrimus.sol` | Primus interface definitions |
 | `PriceRangeCheckV2.sol` | Price validation check |
 
