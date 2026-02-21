@@ -1,200 +1,190 @@
-# Per-Rule Custom Check Design
+# Custom Check Design
 
 ## Overview
 
-Keep one `VeritasValidationRegistryV2` contract, but add per-rule custom check configuration in `PrimusVeritasAppV2`.
+Custom checks allow flexible validation of attestation data. Each rule can have multiple checks with different validation logic.
 
-## Design
+## Architecture
 
-### Custom Check Types
-
-```solidity
-enum CustomCheckType {
-    NONE,           // No custom check (default)
-    MIN_THRESHOLD,  // value >= minValue
-    MAX_THRESHOLD,  // value <= maxValue
-    RANGE,          // minValue <= value <= maxValue
-    EXACT_MATCH,    // value == exactValue
-    CONTAINS        // value contains substring
-}
-
-struct CustomCheck {
-    CustomCheckType checkType;
-    int128 minValue;      // For MIN_THRESHOLD, RANGE
-    int128 maxValue;      // For MAX_THRESHOLD, RANGE
-    int128 exactValue;    // For EXACT_MATCH
-    string containsStr;   // For CONTAINS
-}
-```
-
-### Updated Rule Struct
+### ICustomCheck Interface
 
 ```solidity
-struct VerificationRule {
-    // Existing fields
-    bytes32 urlHash;
-    string url;
-    string dataKey;
-    int128 score;
-    uint8 decimals;
-    uint256 maxAge;
-    bool active;
-    string description;
-    
-    // NEW: Per-rule custom check
-    CustomCheckType checkType;
-    int128 checkMinValue;
-    int128 checkMaxValue;
-    string checkStringValue;
-}
-```
-
-### Updated addRule Function
-
-```solidity
-function addRule(
-    string calldata url,
-    string calldata dataKey,
-    int128 score,
-    uint8 decimals,
-    uint256 maxAge,
-    string calldata description,
-    // NEW parameters
-    CustomCheckType checkType,
-    int128 checkMinValue,
-    int128 checkMaxValue,
-    string calldata checkStringValue
-) external onlyOwner returns (uint256 ruleId);
-```
-
-### Updated customCheck Function
-
-```solidity
-function customCheck(
-    uint256 ruleId,
-    string calldata attestationUrl,
-    string calldata attestationData,
-    uint64 attestationTimestamp
-) external override returns (bool) {
-    VerificationRule storage rule = rules[ruleId];
-    
-    // No custom check
-    if (rule.checkType == CustomCheckType.NONE) {
-        return true;
-    }
-    
-    // Extract value from attestation data
-    int128 value = _extractValue(attestationData, rule.dataKey);
-    
-    // Apply check based on type
-    if (rule.checkType == CustomCheckType.MIN_THRESHOLD) {
-        return value >= rule.checkMinValue;
-    }
-    else if (rule.checkType == CustomCheckType.MAX_THRESHOLD) {
-        return value <= rule.checkMaxValue;
-    }
-    else if (rule.checkType == CustomCheckType.RANGE) {
-        return value >= rule.checkMinValue && value <= rule.checkMaxValue;
-    }
-    else if (rule.checkType == CustomCheckType.EXACT_MATCH) {
-        return value == rule.checkMinValue;
-    }
-    else if (rule.checkType == CustomCheckType.CONTAINS) {
-        return _contains(attestationData, rule.checkStringValue);
-    }
-    
-    return true;
-}
-```
-
-## Usage Examples
-
-### Example 1: Price must be >= $50,000
-
-```javascript
-await app.addRule(
-    'https://api.coinbase.com/v2/exchange-rates?currency=BTC',
-    'btcPrice',
-    100, 2, 3600, 'BTC/USD',
-    CustomCheckType.MIN_THRESHOLD,  // checkType
-    50000,                          // minValue (50000.00)
-    0,                              // maxValue (unused)
-    ''                              // stringValue (unused)
-);
-```
-
-### Example 2: Price must be in range $50,000 - $100,000
-
-```javascript
-await app.addRule(
-    'https://api.coinbase.com/v2/exchange-rates?currency=BTC',
-    'btcPrice',
-    100, 2, 3600, 'BTC/USD in range',
-    CustomCheckType.RANGE,          // checkType
-    50000,                          // minValue
-    100000,                         // maxValue
-    ''                              // stringValue (unused)
-);
-```
-
-### Example 3: No custom check (default)
-
-```javascript
-await app.addRule(
-    'https://api.coinbase.com/v2/exchange-rates?currency=BTC',
-    'btcPrice',
-    100, 2, 3600, 'BTC/USD basic',
-    CustomCheckType.NONE,           // checkType = NONE
-    0, 0, ''                         // all unused
-);
-```
-
-### Example 4: Data must contain specific string
-
-```javascript
-await app.addRule(
-    'https://api.example.com/status',
-    'status',
-    50, 0, 3600, 'API Status Check',
-    CustomCheckType.CONTAINS,        // checkType
-    0, 0,                            // unused
-    'active'                         // must contain "active"
-);
-```
-
-## Benefits
-
-1. **Single Validation Contract** - No need for multiple validator contracts
-2. **Per-Rule Configuration** - Each rule has its own check
-3. **Gas Efficient** - Check logic in same contract
-4. **Extensible** - Easy to add more check types
-
-## Extension: Custom Check Contract (Optional)
-
-For complex checks that can't be expressed with predefined types:
-
-```solidity
-// Add to rule struct
-address customCheckContract;  // If checkType == CUSTOM_CONTRACT
-
-// Interface
 interface ICustomCheck {
-    function check(
-        uint256 ruleId,
-        string calldata url,
-        string calldata data,
-        uint64 timestamp
-    ) external returns (bool);
-}
-
-// In customCheck function
-if (rule.checkType == CustomCheckType.CUSTOM_CONTRACT) {
-    return ICustomCheck(rule.customCheckContract).check(ruleId, url, data, timestamp);
+    function validate(
+        string memory dataKey,
+        string memory attestationData,
+        bytes memory params
+    ) external returns (bool passed, int128 value);
 }
 ```
 
----
+### Check Implementation
 
-Should I implement this design? Do you want:
-1. **Predefined check types only** (simpler, gas efficient)
-2. **With custom contract option** (more flexible, but adds complexity)
+Checks are deployed as separate contracts in the `checks/` folder:
+
+#### PriceRangeCheck
+
+Validates numeric values within a specified range:
+
+```solidity
+contract PriceRangeCheck is ICustomCheck {
+    function validate(
+        string memory dataKey,
+        string memory attestationData,
+        bytes memory params
+    ) external override returns (bool passed, int128 value) {
+        // Decode params: (int128 minPrice, int128 maxPrice)
+        (int128 minPrice, int128 maxPrice) = abi.decode(
+            params,
+            (int128, int128)
+        );
+        
+        // Extract price from attestation JSON
+        value = extractValue(attestationData, dataKey);
+        
+        // Check if within range
+        passed = (value >= minPrice && value <= maxPrice);
+    }
+}
+```
+
+**Usage:**
+```javascript
+// Check if BTC price is between $60,000 and $100,000
+const params = ethers.utils.defaultAbiCoder.encode(
+    ['int128', 'int128'],
+    [6000000, 10000000]  // In cents
+);
+await app.addCheck(
+    ruleId,
+    priceCheck.address,
+    params,
+    100  // Score weight
+);
+```
+
+#### ThresholdCheck
+
+Validates values against a threshold:
+
+```solidity
+contract ThresholdCheck is ICustomCheck {
+    function validate(
+        string memory dataKey,
+        string memory attestationData,
+        bytes memory params
+    ) external override returns (bool passed, int128 value) {
+        // Decode params: (int128 threshold, bool isMin)
+        (int128 threshold, bool isMin) = abi.decode(
+            params,
+            (int128, bool)
+        );
+        
+        value = extractValue(attestationData, dataKey);
+        
+        if (isMin) {
+            passed = (value >= threshold);  // Minimum threshold
+        } else {
+            passed = (value <= threshold);  // Maximum threshold
+        }
+    }
+}
+```
+
+**Usage:**
+```javascript
+// Check if value >= threshold
+const params = ethers.utils.defaultAbiCoder.encode(
+    ['int128', 'bool'],
+    [1000000, true]  // value >= 1,000,000
+);
+await app.addCheck(ruleId, thresholdCheck.address, params, 50);
+```
+
+## Score Calculation
+
+Each check has a weight. The final score is calculated as:
+
+```
+Score = (Sum of passed check weights) / (Total weights) * 100
+```
+
+**Example:**
+- Check 1: Weight 100, Passed ✓
+- Check 2: Weight 50, Passed ✓
+- Check 3: Weight 50, Failed ✗
+
+Score = (100 + 50) / (100 + 50 + 50) * 100 = 150 / 200 * 100 = 75/100
+
+## Adding Custom Checks
+
+### 1. Implement ICustomCheck
+
+```solidity
+contract MyCustomCheck is ICustomCheck {
+    function validate(
+        string memory dataKey,
+        string memory attestationData,
+        bytes memory params
+    ) external override returns (bool passed, int128 value) {
+        // Your validation logic here
+        // Parse attestation JSON
+        // Extract value using dataKey
+        // Validate against params
+        // Return (passed, value)
+    }
+}
+```
+
+### 2. Deploy Check Contract
+
+```javascript
+const MyCheck = await ethers.getContractFactory("MyCustomCheck");
+const myCheck = await MyCheck.deploy();
+await myCheck.deployed();
+```
+
+### 3. Add to Rule
+
+```javascript
+const params = ethers.utils.defaultAbiCoder.encode(
+    [...],  // Your params
+    [...]
+);
+await app.addCheck(ruleId, myCheck.address, params, scoreWeight);
+```
+
+## Best Practices
+
+1. **Return extracted value**: Always return the extracted value for debugging
+2. **Handle errors gracefully**: Return false if parsing fails
+3. **Use appropriate decimals**: Match the decimals specified in the rule
+4. **Document params**: Clearly document what params your check expects
+5. **Test thoroughly**: Test with various valid and invalid inputs
+
+## Example: Complete Setup
+
+```javascript
+// Deploy checks
+const PriceCheck = await ethers.getContractFactory("PriceRangeCheck");
+const priceCheck = await PriceCheck.deploy();
+
+// Add rule
+await app.addRule(
+    "https://api.coinbase.com/v2/exchange-rates?currency=BTC",
+    "btcPrice",
+    2,      // decimals
+    3600,   // max age (1 hour)
+    "BTC Price Check"
+);
+
+// Add checks
+const params = ethers.utils.defaultAbiCoder.encode(
+    ['int128', 'int128'],
+    [6000000, 10000000]  // $60k-$100k in cents
+);
+await app.addCheck(0, priceCheck.address, params, 100);
+
+// Request validation
+await app.requestValidation(agentId, ruleId, [], 1, { value: fee });
+```

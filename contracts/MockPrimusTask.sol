@@ -5,7 +5,7 @@ import "./IPrimus.sol";
 
 /**
  * @title MockPrimusTask
- * @notice A mock PrimusTask for testing the V5 callback flow
+ * @notice A mock PrimusTask for testing the callback flow
  * @dev Simulates the Primus attestation process with correct interface
  */
 contract MockPrimusTask {

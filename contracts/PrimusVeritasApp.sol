@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./VeritasValidationRegistryV4.sol";
+import "./VeritasValidationRegistry.sol";
 import "./IPrimus.sol";
 
 interface ICustomCheck {
@@ -13,17 +13,17 @@ interface ICustomCheck {
 }
 
 // ============================================
-// PRIMUS VERITAS APP V5 - CORRECT CALLBACK
+// PRIMUS VERITAS APP - CORRECT CALLBACK
 // ============================================
 
 /**
- * @title PrimusVeritasAppV5
+ * @title PrimusVeritasApp
  * @notice Fixed callback implementation matching Primus SDK
  * @dev Implements IPrimusNetworkCallback with correct TaskResult struct
  */
-contract PrimusVeritasAppV5 {
+contract PrimusVeritasApp {
     address public owner;
-    VeritasValidationRegistryV4 public immutable registry;
+    VeritasValidationRegistry public immutable registry;
     IPrimusTask public immutable primusTask;
     
     struct VerificationRule {
@@ -97,7 +97,7 @@ contract PrimusVeritasAppV5 {
         address _primusTask
     ) {
         owner = msg.sender;
-        registry = VeritasValidationRegistryV4(_registry);
+        registry = VeritasValidationRegistry(_registry);
         primusTask = IPrimusTask(_primusTask);
     }
     

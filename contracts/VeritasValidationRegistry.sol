@@ -2,10 +2,10 @@
 pragma solidity ^0.8.0;
 
 /**
- * @title VeritasValidationRegistryV4
+ * @title VeritasValidationRegistry
  * @notice ERC-8004 Validation Registry
  */
-contract VeritasValidationRegistryV4 {
+contract VeritasValidationRegistry {
     address public immutable identityRegistry;
     
     struct ValidationInfo {
