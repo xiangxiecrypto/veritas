@@ -1,133 +1,154 @@
 # Veritas Protocol
 
-**Build trust for AI agents with ERC-8004.**
+Complete implementation of Primus zkTLS auto-callback for AI agent reputation.
 
-Veritas combines ERC-8004 agent identity with Primus zkTLS attestations to create verifiable, on-chain reputation for AI agents.
+## Overview
 
-## 🚀 Quick Start
+Veritas Protocol enables AI agents to build verifiable reputation using Primus zkTLS attestations. The protocol automatically processes attestations when Primus completes verification.
 
-### Install
+## Architecture
+
+```
+User
+  │
+  ├─ Deploy PrimusVeritasApp
+  │
+  ├─ Call TaskContract.submitTask() directly
+  │  ├─ Sets callback = PrimusVeritasApp address
+  │  └─ Returns taskId
+  │
+  ├─ Use Primus SDK attest()
+  │  └─ Generates zkTLS proof
+  │
+  └─ Primus calls reportTaskResultCallback()
+     └─ Contract processes attestation automatically
+```
+
+## Why Direct TaskContract Calls?
+
+The Primus SDK's `PrimusNetwork.submitTask()` has a bug where `callbackAddress` is ignored. By calling `TaskContract.submitTask()` directly with ethers.js, the callback is set correctly and auto-callback works.
+
+## Files
+
+### Core Contracts
+
+| File | Purpose |
+|------|---------|
+| `PrimusVeritasAppV5.sol` | Main contract with auto-callback support |
+| `VeritasValidationRegistryV4.sol` | Stores validation results |
+| `IPrimus.sol` | Primus interface definitions |
+| `PriceRangeCheckV2.sol` | Price validation check |
+
+### Scripts
+
+| File | Purpose |
+|------|---------|
+| `deploy-and-test.js` | Complete deployment and testing |
+
+## Usage
+
+### 1. Install Dependencies
 
 ```bash
-npm install ethers @primuslabs/network-core-sdk
+npm install
 ```
 
-### Register & Verify
+### 2. Configure Environment
+
+Create `.env`:
+```
+PRIVATE_KEY=your_private_key
+```
+
+### 3. Deploy and Test
+
+```bash
+npx hardhat run scripts/deploy-and-test.js --network baseSepolia
+```
+
+This will:
+1. Deploy `PrimusVeritasAppV5`
+2. Add verification rules
+3. Submit task to Primus (direct TaskContract call)
+4. Generate attestation using Primus SDK
+5. Wait for auto-callback
+6. Verify contract processed the attestation
+
+## Key Implementation
+
+### Direct TaskContract Call
 
 ```javascript
-const { ethers } = require('ethers');
-const { PrimusNetwork } = require('@primuslabs/network-core-sdk');
+const TASK_ABI = [
+  "function submitTask(address,string,uint256,uint8,address) payable returns (bytes32)",
+  "function queryLatestFeeInfo(uint8) view returns (tuple(uint256,uint256))"
+];
 
-// Setup
-const provider = new ethers.providers.JsonRpcProvider('https://sepolia.base.org');
-const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
+const taskContract = new ethers.Contract(PRIMUS_TASK, TASK_ABI, wallet);
 
-const APP = '0x0552bD6434D79073d1167BC39d4D01f6c3333F6e';
-const FEE = ethers.BigNumber.from('10000000000'); // 0.00000001 ETH
+// Get fee
+const feeInfo = await taskContract.queryLatestFeeInfo(0);
+const totalFee = feeInfo.primusFee.add(feeInfo.attestorFee);
 
-// Step 1: Request verification
-const app = new ethers.Contract(APP, ABI, wallet);
-const tx = await app.requestVerification(2, agentId, { value: FEE });
-const receipt = await tx.wait();
-
-// Get task ID from logs
-const taskId = getTaskIdFromLogs(receipt);
-
-// Step 2: Attest via SDK
-const primus = new PrimusNetwork();
-await primus.init(wallet, 84532);
-
-const result = await primus.attest({
-  address: wallet.address,
-  userAddress: wallet.address,
-  taskId,
-  taskTxHash: tx.hash,
-  taskAttestors: ['0x0DE886e31723e64Aa72e51977B14475fB66a9f72'],
-  requests: [{
-    url: 'https://api.coinbase.com/v2/exchange-rates?currency=BTC',
-    method: 'GET', header: '', body: ''
-  }],
-  responseResolves: [[{  // ⚠️ Must be array of arrays!
-    keyName: 'btcPrice',
-    parseType: '',
-    parsePath: '$.data.rates.USD'
-  }]]
-}, 60000);
-
-// Step 3: Submit attestation to contract
-const att = result[0].attestation;
-await app.submitAttestation(
-  taskId,
-  'https://api.coinbase.com/v2/exchange-rates?currency=BTC',
-  att.data,
-  Math.floor(att.timestamp / 1000)
+// Submit task with correct callback!
+const tx = await taskContract.submitTask(
+  wallet.address,  // sender
+  "",              // templateId
+  1,               // attestorCount
+  0,               // tokenSymbol (ETH)
+  app.address,     // callback ← SET CORRECTLY!
+  { value: totalFee }
 );
-
-console.log('✅ Reputation granted!');
 ```
 
-## 📋 Two-Step Flow
+### Auto-Callback Handler
 
+```solidity
+function reportTaskResultCallback(
+    bytes32 taskId,
+    TaskResult calldata taskResult,
+    bool success
+) external onlyTask {
+    // Automatically called by Primus when attestation completes
+    // Processes attestation and calculates score
+}
 ```
-STEP 1: REGISTER IDENTITY (ERC-8004)
-  Agent → IdentityRegistry.register() → gets agentId
 
-STEP 2: BUILD REPUTATION (SDK Integration)
-  1. requestVerification() → submits task to Primus
-  2. SDK.attest() → zkTLS attestation (off-chain)
-  3. submitAttestation() → validates & grants reputation
-```
-
-## 🔐 Security
-
-- ✅ Only registered agents can build reputation
-- ✅ Only the agent owner can request verification
-- ✅ Cryptographic proof via zkTLS
-- ✅ Attestation validated on-chain before granting
-
-## 📚 Documentation
-
-| Document | Description |
-|----------|-------------|
-| [MEMORY.md](./MEMORY.md) | Deployed contracts, current status |
-| [FLOW_DETAILS.md](./FLOW_DETAILS.md) | Complete technical documentation |
-| [Design](docs/DESIGN.md) | Product design, use cases |
-
-## 🏗️ Deployed Contracts (Base Sepolia)
+## Contract Addresses (Base Sepolia)
 
 | Contract | Address |
 |----------|---------|
-| IdentityRegistry | `0x8004A818BFB912233c491871b3d84c89A494BD9e` |
-| PrimusVeritasAppV2 | `0x0552bD6434D79073d1167BC39d4D01f6c3333F6e` |
-| VeritasValidationRegistryV2 | `0xF18C120B0cc018c0862eDaE6B89AB2485FD35EE3` |
-| ReputationRegistry | `0x8004B663056A597Dffe9eCcC1965A193B7388713` |
-| Primus TaskContract | `0xC02234058caEaA9416506eABf6Ef3122fCA939E8` |
+| Primus Task | `0xC02234058caEaA9416506eABf6Ef3122fCA939E8` |
+| Registry | `0x257DC4B38066840769EeA370204AD3724ddb0836` |
 
-## ⚠️ Critical Details
+## How It Works
 
-1. **SDK responseResolves** must be `[[{...}]]` (array of arrays)
-2. **dataKey** must match SDK's `keyName` (e.g., `"btcPrice"`)
-3. **Fee** is exactly 10^10 wei = 0.00000001 ETH
-4. **Timestamp** in seconds for contract, milliseconds from SDK
+1. **Deploy**: Deploy `PrimusVeritasAppV5` with Registry and Primus Task addresses
+2. **Add Rules**: Define verification rules (e.g., BTC price between $60k-$100k)
+3. **Submit Task**: Call `TaskContract.submitTask()` directly with your contract as callback
+4. **Attest**: Use Primus SDK to generate zkTLS proof
+5. **Auto-Process**: Primus automatically calls your contract's callback function
+6. **Score**: Contract validates data and calculates reputation score
 
-## 📂 Project Structure
+## Testing
 
-```
-contracts/
-  PrimusVeritasAppV2.sol       # Main verification app
-  VeritasValidationRegistryV2.sol  # Validation logic
-  PrimusTaskInterface.sol      # Primus interface
-  IVeritasApp.sol              # App interface
+Local tests verify:
+- ✅ Callback restricted to Task contract only
+- ✅ TaskResult struct properly handled
+- ✅ Automatic validation works
+- ✅ Score calculation (0-100)
+- ✅ Duplicate prevention
+- ✅ Unauthorized access blocked
 
-scripts/
-  deploy-app-v2.js             # Deployment script
-
-src/
-  sdk.ts                       # TypeScript SDK
+Run tests:
+```bash
+npx hardhat test
 ```
 
-## 🔗 Links
+## Documentation
 
-- [Explorer](https://sepolia.basescan.org/address/0x0552bD6434D79073d1167BC39d4D01f6c3333F6e)
-- [Primus Labs](https://primuslabs.xyz)
-- [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004)
+See `docs/` for detailed technical documentation.
+
+## License
+
+MIT
