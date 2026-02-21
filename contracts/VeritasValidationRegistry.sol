@@ -4,20 +4,22 @@ pragma solidity ^0.8.0;
 /**
  * @title VeritasValidationRegistry
  * @notice ERC-8004 Validation Registry
+ * @dev Enables agents to request verification and validators to provide responses
  */
 contract VeritasValidationRegistry {
-    address public immutable identityRegistry;
+    address public identityRegistry;
+    address public owner;
     
     struct ValidationInfo {
         address validatorAddress;
         uint256 agentId;
+        string requestURI;
         bytes32 requestHash;
         uint8 response;
         string responseURI;
         bytes32 responseHash;
         string tag;
         uint256 lastUpdate;
-        bool responded;
     }
     
     mapping(bytes32 => ValidationInfo) public validations;
@@ -27,6 +29,7 @@ contract VeritasValidationRegistry {
     event ValidationRequest(
         address indexed validatorAddress,
         uint256 indexed agentId,
+        string requestURI,
         bytes32 indexed requestHash
     );
     
@@ -40,13 +43,32 @@ contract VeritasValidationRegistry {
         string tag
     );
     
-    constructor(address _identityRegistry) {
-        identityRegistry = _identityRegistry;
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
     }
     
+    function initialize(address identityRegistry_) external {
+        require(identityRegistry == address(0), "Already initialized");
+        identityRegistry = identityRegistry_;
+        owner = msg.sender;
+    }
+    
+    function getIdentityRegistry() external view returns (address) {
+        return identityRegistry;
+    }
+    
+    /**
+     * @notice Request validation from a validator
+     * @param validatorAddress Address of validator smart contract
+     * @param agentId Agent requesting validation
+     * @param requestURI Off-chain data URI containing validation info
+     * @param requestHash Commitment to request data (keccak256)
+     */
     function validationRequest(
         address validatorAddress,
         uint256 agentId,
+        string calldata requestURI,
         bytes32 requestHash
     ) external {
         // Verify caller owns the agent
@@ -58,21 +80,29 @@ contract VeritasValidationRegistry {
         validations[requestHash] = ValidationInfo({
             validatorAddress: validatorAddress,
             agentId: agentId,
+            requestURI: requestURI,
             requestHash: requestHash,
             response: 0,
             responseURI: "",
             responseHash: bytes32(0),
             tag: "",
-            lastUpdate: block.timestamp,
-            responded: false
+            lastUpdate: block.timestamp
         });
         
         agentValidations[agentId].push(requestHash);
         validatorRequests[validatorAddress].push(requestHash);
         
-        emit ValidationRequest(validatorAddress, agentId, requestHash);
+        emit ValidationRequest(validatorAddress, agentId, requestURI, requestHash);
     }
     
+    /**
+     * @notice Submit validation response
+     * @param requestHash Hash of original request
+     * @param response Score 0-100 (0=failed, 100=passed, or intermediate)
+     * @param responseURI Optional off-chain evidence/audit URI
+     * @param responseHash Optional commitment to responseURI
+     * @param tag Optional categorization tag
+     */
     function validationResponse(
         bytes32 requestHash,
         uint8 response,
@@ -91,7 +121,6 @@ contract VeritasValidationRegistry {
         v.responseHash = responseHash;
         v.tag = tag;
         v.lastUpdate = block.timestamp;
-        v.responded = true;
         
         emit ValidationResponse(
             v.validatorAddress,
@@ -104,11 +133,14 @@ contract VeritasValidationRegistry {
         );
     }
     
+    /**
+     * @notice Get validation status
+     * @param requestHash Hash of validation request
+     */
     function getValidationStatus(bytes32 requestHash) external view returns (
         address validatorAddress,
         uint256 agentId,
         uint8 response,
-        string memory responseURI,
         bytes32 responseHash,
         string memory tag,
         uint256 lastUpdate
@@ -118,13 +150,18 @@ contract VeritasValidationRegistry {
             v.validatorAddress,
             v.agentId,
             v.response,
-            v.responseURI,
             v.responseHash,
             v.tag,
             v.lastUpdate
         );
     }
     
+    /**
+     * @notice Get aggregated validation statistics for an agent
+     * @param agentId Agent to query
+     * @param validatorAddresses Optional filter for specific validators
+     * @param tag Optional filter for specific tag
+     */
     function getSummary(
         uint256 agentId,
         address[] calldata validatorAddresses,
@@ -137,6 +174,7 @@ contract VeritasValidationRegistry {
         for (uint256 i = 0; i < hashes.length; i++) {
             ValidationInfo storage v = validations[hashes[i]];
             
+            // Filter by validator if specified
             if (validatorAddresses.length > 0) {
                 bool found = false;
                 for (uint256 j = 0; j < validatorAddresses.length; j++) {
@@ -148,9 +186,11 @@ contract VeritasValidationRegistry {
                 if (!found) continue;
             }
             
+            // Filter by tag if specified
             if (bytes(tag).length > 0 && !_eq(v.tag, tag)) continue;
             
-            if (v.responded) {
+            // Only count if validator has responded (response > 0)
+            if (v.response > 0) {
                 total += v.response;
                 validCount++;
             }
@@ -160,16 +200,34 @@ contract VeritasValidationRegistry {
         return (validCount, averageResponse);
     }
     
+    /**
+     * @notice Get all validation request hashes for an agent
+     * @param agentId Agent to query
+     */
     function getAgentValidations(uint256 agentId) external view returns (bytes32[] memory) {
         return agentValidations[agentId];
+    }
+    
+    /**
+     * @notice Get all validation request hashes for a validator
+     * @param validatorAddress Validator to query
+     */
+    function getValidatorRequests(address validatorAddress) external view returns (bytes32[] memory) {
+        return validatorRequests[validatorAddress];
     }
     
     function _eq(string memory a, string memory b) internal pure returns (bool) {
         return keccak256(bytes(a)) == keccak256(bytes(b));
     }
     
-    // Internal function to get owner - will be called via delegatecall or override
-    function _ownerOf(uint256) internal view virtual returns (address) {
+    function _ownerOf(uint256 agentId) internal view returns (address) {
+        // Call identity registry to get owner
+        (bool success, bytes memory result) = identityRegistry.staticcall(
+            abi.encodeWithSignature("ownerOf(uint256)", agentId)
+        );
+        if (success && result.length >= 32) {
+            return abi.decode(result, (address));
+        }
         return address(0);
     }
 }
