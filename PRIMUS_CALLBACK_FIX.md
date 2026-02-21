@@ -1,146 +1,143 @@
 # Primus Auto-Callback Fix
 
+## Overview
+
+This branch implements `PrimusVeritasAppV5` with correct Primus SDK callback support for automatic attestation processing.
+
 ## The Problem
 
-Previous V4 contracts had **wrong callback assumptions**:
+Previous versions required manual `submitAttestation()` calls after SDK attestation. The goal was to have Primus automatically call the contract when attestation completes.
 
-1. **Wrong caller**: Used `onlyPrimus` (checking attestor address)
-   - Actually, the **Task contract** calls the callback, not the attestor directly
-   
-2. **Wrong signature**: Some contracts had flattened parameters
-   - Correct: `reportTaskResultCallback(bytes32, TaskResult, bool)`
+## The Solution
 
-## The Solution (V5)
-
-`PrimusVeritasAppV5.sol` implements the correct Primus callback interface:
+`PrimusVeritasAppV5.sol` implements the correct `IPrimusNetworkCallback` interface:
 
 ```solidity
-// Stores Task contract address
-IPrimusTask public immutable primusTask;
-
-// Only Task contract can call callback
-modifier onlyTask() {
-    require(msg.sender == address(primusTask), "Only task contract");
-    _;
-}
-
-// Correct callback signature
 function reportTaskResultCallback(
     bytes32 taskId,
-    TaskResult calldata taskResult,  // Nested struct from Primus
+    TaskResult calldata taskResult,
     bool success
-) external onlyTask {
-    // Process attestation automatically
-}
+) external onlyTask
 ```
 
-## Key Flow
+Key features:
+- Uses `onlyTask` modifier (callback comes from Task contract, not attestor directly)
+- Properly handles `TaskResult` struct from Primus
+- Automatically validates attestation data and calculates scores
+- Stores results in `VeritasValidationRegistryV4`
 
-```
-User -> appV5.requestValidation()
-  └─> primusTask.submitTask(..., callback=appV5.address)  [PAYS FEE]
-       └─> Primus network processes attestation
-            └─> primusTask calls appV5.reportTaskResultCallback()
-                 └─> Automatic validation & scoring
-```
+## SDK Integration Issue
 
-## Usage
+**IMPORTANT:** The Primus SDK (v0.1.8) has a bug where the `callbackAddress` parameter in `submitTask()` is ignored, causing the callback to always be set to `0x0000...`.
 
-### 1. Deploy V5
-
-```bash
-cd /home/xiang/.openclaw/workspace
-npx hardhat run scripts/deploy-and-test-v5.js --network baseSepolia
-```
-
-### 2. Key Differences from V2
-
-| V2 (Manual) | V5 (Auto-Callback) |
-|-------------|-------------------|
-| User calls `requestVerification()` | User calls `requestValidation()` |
-| User manually calls SDK `attest()` | Primus handles attestation |
-| User manually calls `submitAttestation()` | **Automatic callback processes result** |
-
-### 3. SDK Integration
-
-When using Primus SDK, pass the V5 contract address as callback:
+### Working SDK Flow (with workaround):
 
 ```javascript
-const result = await primus.attest({
-  taskId,
-  taskTxHash: tx.hash,
-  taskAttestors: ['0x0DE886e31723e64Aa72e51977B14475fB66a9f72'],
-  requests: [{ 
-    url: 'https://api.coinbase.com/v2/exchange-rates?currency=BTC', 
-    method: 'GET' 
-  }],
-  responseResolves: [[{ 
-    keyName: 'btcPrice', 
-    parsePath: '$.data.rates.USD' 
-  }]]
-}, 60000);
+const primus = new PrimusNetwork();
+await primus.init(wallet, 84532);  // Base Sepolia
 
-// NO MANUAL submitAttestation() NEEDED!
-// V5 contract receives callback automatically
+// 1. SDK submitTask - creates task structure
+// Note: SDK ignores callbackAddress, sets to 0x0000...
+const submitResult = await primus.submitTask({
+  address: wallet.address,
+  templateId: "",  // Can be empty
+  attestorCount: 1,
+  tokenSymbol: 0,  // ETH
+  callbackAddress: appV5.address  // SDK ignores this :(
+});
+
+// 2. SDK attest - generates zkTLS proof
+const attestResult = await primus.attest({
+  address: wallet.address,
+  taskId: submitResult.taskId,
+  taskTxHash: submitResult.taskTxHash,
+  taskAttestors: submitResult.taskAttestors,
+  requests: [{ 
+    url: 'https://api.coinbase.com/v2/exchange-rates?currency=BTC',
+    method: 'GET'
+  }],
+  responseResolves: [[{
+    keyName: 'btcPrice',
+    parseType: 'json',  // Required!
+    parsePath: '$.data.rates.USD'
+  }]]
+});
+
+// 3. Poll for result
+const taskResult = await primus.verifyAndPollTaskResult({
+  taskId: attestResult[0].taskId,
+  reportTxHash: attestResult[0].reportTxHash
+});
+
+// 4. Manual submission (SDK bug workaround)
+await appV5.processAttestation(
+  taskId,
+  attestation.data,
+  timestamp,
+  ruleId
+);
 ```
+
+## Files Added
+
+### Contracts
+- `PrimusVeritasAppV5.sol` - Main contract with callback interface
+- `IPrimus.sol` - Shared Primus interfaces (TaskResult, Attestation, etc.)
+- `MockPrimusTask.sol` - For local Hardhat testing
+- `PriceRangeCheckV2.sol` - Custom validation checks
+
+### Scripts
+- `deploy-and-test-v5.js` - Deployment and testing
+- `test-v5-local.js` - Local Hardhat tests
+- `debug-primus-sdk.js` - SDK parameter debugging
+- `check-callback-status.js` - Monitor callback status
+
+### Documentation
+- `PRIMUS_CALLBACK_FIX.md` - This file
+- `PRIMUS_SDK_ANALYSIS.md` - Detailed SDK bug analysis
 
 ## Testing
 
-Run the test script to verify:
-
+### Local Tests (Hardhat)
 ```bash
-PRIVATE_KEY=0x... npx hardhat run scripts/deploy-and-test-v5.js --network baseSepolia
+npx hardhat test scripts/test-v5-local.js
 ```
 
-The script will:
-1. Deploy V5
-2. Add a BTC price rule
-3. Submit validation request with callback
-4. Monitor for Primus callback (1-2 minutes)
-5. Verify automatic processing
+All tests pass:
+- ✅ Callback restricted to Task contract
+- ✅ TaskResult struct properly handled
+- ✅ Automatic validation on callback works
+- ✅ Score calculation correct (0-100)
+- ✅ Duplicate processing prevented
+- ✅ Unauthorized callbacks rejected
 
-## Fallback
-
-If callback doesn't work, use manual processing:
-
-```solidity
-// Anyone can call this with valid Primus attestation
-function processAttestation(
-    bytes32 taskId,
-    string calldata attestationData,
-    uint64 timestamp,
-    uint256 ruleId
-) external
+### Base Sepolia Deployment
+```bash
+npx hardhat run scripts/deploy-and-test-v5.js --network baseSepolia
 ```
 
-## Files
+Recent deployments:
+- AppV5: `0x924b3f01C5889259bff175507917bA0B607842B6`
+- AppV5: `0x3114776b136dCe2360fA33AD5442684A6c1b2e06`
 
-- `contracts/PrimusVeritasAppV5.sol` - Fixed contract
-- `scripts/deploy-and-test-v5.js` - Deployment & test script
-- `contracts/MockPrimusTask.sol` - For local testing
+## Known Issues
 
-## Verification
+1. **SDK Bug**: `callbackAddress` parameter ignored in `submitTask()`
+   - Status: Reported to Primus team
+   - Workaround: Use manual `processAttestation()` submission
 
-Check callback attempts:
-```solidity
-uint256 count = appV5.callbackAttemptCount();
-CallbackAttempt memory attempt = appV5.getCallbackAttempt(count - 1);
-// attempt.caller should be the Primus Task contract
-```
+2. **Auto-callback**: Requires SDK fix to work automatically
+   - Current: Manual submission after SDK attestation
+   - Future: Auto-callback when SDK fixed
 
-## Troubleshooting
+## Next Steps
 
-### SDK Error: "type must be string, but is null"
-The Primus SDK may throw internal JSON errors. If this happens:
-1. The task is still submitted to Primus
-2. Run the manual attestation script:
-   ```bash
-   TASK_ID=0x... TASK_TX_HASH=0x... APP_V5=0x... npx hardhat run scripts/manual-primus-attest.js --network baseSepolia
-   ```
-3. Or use the Primus SDK directly in your own script
+1. Wait for Primus SDK fix for `callbackAddress` parameter
+2. Once fixed, auto-callback will work without manual submission
+3. Contract is ready and tested - just needs SDK update
 
-### No Callback Received
-If the callback isn't received after attest():
-1. Check the Primus Task status: `scripts/check-primus-task.js`
-2. Verify the callback address is set correctly
-3. The Primus network may be delayed - wait a few minutes and check again
+## References
+
+- Primus SDK Example: https://github.com/primus-labs/zktls-demo/blob/main/network-core-sdk-example/index.js
+- Base Sepolia Explorer: https://sepolia.basescan.org
+- Primus Task Contract: `0xC02234058caEaA9416506eABf6Ef3122fCA939E8`
