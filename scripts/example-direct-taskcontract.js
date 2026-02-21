@@ -89,6 +89,7 @@ async function main() {
 
   // KEY: Call submitTask directly on the contract (bypass PrimusNetwork SDK)
   const gasPrice = await wallet.provider.getGasPrice();
+  const nonce = await wallet.getTransactionCount();
   const tx = await taskContract.submitTask(
     wallet.address,     // 1. sender (who pays)
     "",                 // 2. templateId (can be empty)
@@ -97,7 +98,8 @@ async function main() {
     appV5.address,      // 5. callback ← THIS WORKS!
     { 
       value: totalFee,
-      gasPrice: gasPrice.mul(2) // Double gas price to avoid replacement fee error
+      gasPrice: gasPrice.mul(2), // Double gas price
+      nonce: nonce // Explicit nonce
     }
   );
 
