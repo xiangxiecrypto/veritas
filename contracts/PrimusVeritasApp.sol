@@ -3,29 +3,18 @@ pragma solidity ^0.8.0;
 
 import "./VeritasValidationRegistry.sol";
 import "./IPrimus.sol";
-
-interface ICustomCheck {
-    function validate(
-        string memory dataKey,
-        string memory attestationData,
-        bytes memory params
-    ) external returns (bool passed, int128 value);
-}
-
-// ============================================
-// PRIMUS VERITAS APP - CORRECT CALLBACK
-// ============================================
+import "./ICustomCheck.sol";
 
 /**
  * @title PrimusVeritasApp
- * @notice Fixed callback implementation matching Primus SDK
- * @dev Implements IPrimusNetworkCallback with correct TaskResult struct
+ * @notice Main application for Primus zkTLS validation with auto-callback
+ * @dev Implements IPrimusNetworkCallback for automatic attestation processing
  */
 contract PrimusVeritasApp {
     address public owner;
     VeritasValidationRegistry public immutable registry;
     IPrimusTask public immutable primusTask;
-    
+
     struct VerificationRule {
         string url;             // URL to fetch data from (e.g., "https://api.coinbase.com/v2/exchange-rates?currency=BTC")
         string dataKey;         // Key name for the data (e.g., "btcPrice")
@@ -36,30 +25,29 @@ contract PrimusVeritasApp {
         string description;     // Human-readable description
         bytes32 ruleHash;       // Hash of (url, dataKey, parsePath) for verification
     }
-    
+
     struct CustomCheck {
         address checkContract;
         bytes params;
         int128 score;
         bool active;
     }
-    
+
     struct PendingValidation {
         uint256 ruleId;
         uint256[] checkIds;
         uint256 agentId;
         address requester;
     }
-    
+
     mapping(uint256 => VerificationRule) public rules;
     mapping(uint256 => mapping(uint256 => CustomCheck)) public checks;
     mapping(uint256 => uint256) public checkCount;
     uint256 public ruleCount;
-    
-    // Track pending validations by taskId
+
     mapping(bytes32 => PendingValidation) public pendingValidations;
     mapping(bytes32 => bool) public processedTasks;
-    
+
     // Debug: Track all callback attempts
     struct CallbackAttempt {
         address caller;
@@ -71,8 +59,7 @@ contract PrimusVeritasApp {
     }
     mapping(uint256 => CallbackAttempt) public callbackAttempts;
     uint256 public callbackAttemptCount;
-    
-    // Events
+
     event RuleAdded(uint256 indexed ruleId, string url);
     event CheckAdded(uint256 indexed ruleId, uint256 indexed checkId, int128 score);
     event ValidationRequested(bytes32 indexed taskId, uint256 indexed ruleId, uint256 indexed agentId);
@@ -80,41 +67,27 @@ contract PrimusVeritasApp {
     event CheckPassed(uint256 indexed ruleId, uint256 indexed checkId, int128 score, int128 value);
     event CheckFailed(uint256 indexed ruleId, uint256 indexed checkId);
     event ValidationCompleted(bytes32 indexed taskId, uint8 score);
-    
+
     modifier onlyOwner() {
         require(msg.sender == owner, "Not owner");
         _;
     }
-    
-    /**
-     * @dev Only the Primus Task contract can call the callback
-     */
+
     modifier onlyTask() {
         require(msg.sender == address(primusTask), "Only task contract");
         _;
     }
-    
-    constructor(
-        address _registry,
-        address _primusTask
-    ) {
+
+    constructor(address _registry, address _primusTask) {
         owner = msg.sender;
         registry = VeritasValidationRegistry(_registry);
         primusTask = IPrimusTask(_primusTask);
     }
-    
-    // ============================================
-    // ADMIN
-    // ============================================
-    
+
     function transferOwnership(address newOwner) external onlyOwner {
         owner = newOwner;
     }
-    
-    // ============================================
-    // RULE MANAGEMENT
-    // ============================================
-    
+
     function addRule(
         string calldata url,
         string calldata dataKey,
@@ -140,7 +113,7 @@ contract PrimusVeritasApp {
         });
         emit RuleAdded(ruleId, url);
     }
-    
+
     function addCheck(
         uint256 ruleId,
         address checkContract,
@@ -156,19 +129,7 @@ contract PrimusVeritasApp {
         });
         emit CheckAdded(ruleId, checkId, score);
     }
-    
-    // ============================================
-    // VALIDATION REQUEST
-    // ============================================
-    
-    /**
-     * @notice Request validation with Primus callback
-     * @dev Submits task to Primus with THIS CONTRACT as callback address
-     * @param agentId The agent to validate
-     * @param ruleId The verification rule to use
-     * @param checkIds Specific checks to run (empty for all)
-     * @param attestorCount Number of attestors to request
-     */
+
     function requestValidation(
         uint256 agentId,
         uint256 ruleId,
@@ -177,22 +138,21 @@ contract PrimusVeritasApp {
     ) external payable returns (bytes32 taskId) {
         VerificationRule storage rule = rules[ruleId];
         require(rule.active, "Rule inactive");
-        
+
         // Calculate fee
         FeeInfo memory feeInfo = primusTask.queryLatestFeeInfo(TokenSymbol.ETH);
         uint256 totalFee = (feeInfo.primusFee + feeInfo.attestorFee) * attestorCount;
         require(msg.value >= totalFee, "Insufficient fee");
-        
+
         // Submit task to Primus with THIS CONTRACT as callback
-        // This is the key: Primus will call reportTaskResultCallback on this contract
         taskId = primusTask.submitTask{value: totalFee}(
-            msg.sender,           // sender (original requester)
-            rule.templateId,      // templateId (e.g., Coinbase BTC URL)
-            attestorCount,        // number of attestors
-            TokenSymbol.ETH,      // fee token
-            address(this)         // ← CALLBACK: this contract receives the result
+            msg.sender,
+            rule.url,
+            attestorCount,
+            TokenSymbol.ETH,
+            address(this)
         );
-        
+
         // Register validation request with ERC-8004 ValidationRegistry
         // This contract acts as the validator
         registry.validationRequest(
@@ -201,7 +161,7 @@ contract PrimusVeritasApp {
             rule.url,           // requestURI (URL for attestation data)
             taskId              // requestHash (unique identifier)
         );
-        
+
         // Store pending validation details
         PendingValidation storage pending = pendingValidations[taskId];
         pending.ruleId = ruleId;
@@ -210,21 +170,17 @@ contract PrimusVeritasApp {
         for (uint256 i = 0; i < checkIds.length; i++) {
             pending.checkIds.push(checkIds[i]);
         }
-        
+
         emit ValidationRequested(taskId, ruleId, agentId);
-        
+
         // Refund excess
         if (msg.value > totalFee) {
             payable(msg.sender).transfer(msg.value - totalFee);
         }
-        
+
         return taskId;
     }
-    
-    // ============================================
-    // PRIMUS CALLBACK - Called by Primus Task contract
-    // ============================================
-    
+
     /**
      * @notice Called by Primus Task contract when attestation is complete
      * @dev This is the REAL callback from Primus - matches IPrimusNetworkCallback
@@ -247,55 +203,65 @@ contract PrimusVeritasApp {
             blockTime: block.timestamp,
             success: success
         });
-        
+
         emit CallbackReceived(taskId, msg.sender, taskResult.attestor);
-        
+
         // Don't process if failed or already processed
         if (!success) {
             return;
         }
-        
+
         if (processedTasks[taskId]) {
             return;
         }
-        
+
         // Mark as processed
         processedTasks[taskId] = true;
-        
+
         // Get pending validation details
         PendingValidation storage pending = pendingValidations[taskId];
         uint256 ruleId = pending.ruleId;
-        
+
         // If no pending validation found, use rule 0 as default
         if (pending.requester == address(0)) {
             ruleId = 0;
         }
-        
+
         VerificationRule storage rule = rules[ruleId];
         if (!rule.active) {
             return; // Silently fail if rule inactive
         }
-        
+
         // Verify freshness
         if (block.timestamp - taskResult.attestation.timestamp > rule.maxAge) {
             return; // Expired
         }
-        
+
+        // Verify attestation matches the rule parameters (BASIC CHECK)
+        // The attestation.request contains the URL that was fetched (as bytes)
+        // We hash (URL + dataKey + parsePath) and verify it matches the stored ruleHash
+        bytes32 attestationHash = keccak256(abi.encodePacked(
+            taskResult.attestation.request,  // URL in bytes
+            rule.dataKey,
+            rule.parsePath
+        ));
+        require(attestationHash == rule.ruleHash, "Rule mismatch: URL, dataKey, or parsePath don't match");
+
         // Determine which checks to run
-        uint256[] memory checkIds = pending.checkIds.length > 0 
-            ? pending.checkIds 
+        uint256[] memory checkIds = pending.checkIds.length > 0
+            ? pending.checkIds
             : _getAllCheckIds(ruleId);
-        
+
         // Run custom checks
         int128 totalScore = 0;
         int128 maxScore = 0;
-        
+
         for (uint256 i = 0; i < checkIds.length; i++) {
             CustomCheck storage check = checks[ruleId][checkIds[i]];
             if (!check.active) continue;
-            
+
             maxScore += check.score;
-            
+
             try ICustomCheck(check.checkContract).validate(
                 rule.dataKey,
                 taskResult.attestation.data,
@@ -311,12 +277,12 @@ contract PrimusVeritasApp {
                 emit CheckFailed(ruleId, checkIds[i]);
             }
         }
-        
+
         // Calculate 0-100 score
-        uint8 response = maxScore > 0 
+        uint8 response = maxScore > 0
             ? uint8((uint256(int256(totalScore)) * 100) / uint256(int256(maxScore)))
             : 0;
-        
+
         // Store result in Registry (ERC-8004 compliant)
         // responseURI points to attestation data, responseHash is its commitment
         try registry.validationResponse(
@@ -330,103 +296,10 @@ contract PrimusVeritasApp {
         } catch {
             // Registry call failed - still emit completion event
         }
-        
+
         emit ValidationCompleted(taskId, response);
     }
-    
-    // ============================================
-    // FALLBACK: Manual processing
-    // ============================================
-    
-    /**
-     * @notice Process attestation manually (fallback if callback fails)
-     * @dev Can be called by anyone with valid Primus attestation data
-     * @param taskId The task ID
-     * @param attestationData The JSON attestation data
-     * @param timestamp The attestation timestamp
-     * @param ruleId The rule to validate against
-     */
-    function processAttestation(
-        bytes32 taskId,
-        string calldata attestationData,
-        uint64 timestamp,
-        uint256 ruleId
-    ) external {
-        require(!processedTasks[taskId], "Already processed");
-        
-        // Verify this task was submitted and get details
-        TaskInfo memory taskInfo = primusTask.queryTask(taskId);
-        require(taskInfo.submitter != address(0), "Task not found");
-        require(taskInfo.callback == address(this), "Wrong callback contract");
-        
-        // Verify at least one attestor has reported
-        require(taskInfo.taskResults.length > 0, "No results yet");
-        
-        // Mark as processed
-        processedTasks[taskId] = true;
-        
-        _processAttestation(taskId, attestationData, timestamp, ruleId);
-    }
-    
-    function _processAttestation(
-        bytes32 taskId,
-        string memory attestationData,
-        uint64 timestamp,
-        uint256 ruleId
-    ) internal {
-        VerificationRule storage rule = rules[ruleId];
-        require(rule.active, "Rule inactive");
-        require(block.timestamp - timestamp <= rule.maxAge, "Expired");
-        
-        // For manual submission, we cannot verify the URL from attestation
-        // This is a limitation - the hash check only works with full attestation from Primus
-        // The check above in reportTaskResultCallback handles the automated case
-        
-        uint256 totalChecks = checkCount[ruleId];
-        int128 totalScore = 0;
-        int128 maxScore = 0;
-        
-        for (uint256 i = 0; i < totalChecks; i++) {
-            CustomCheck storage check = checks[ruleId][i];
-            maxScore += check.score;
-            
-            if (check.active) {
-                try ICustomCheck(check.checkContract).validate(
-                    rule.dataKey,
-                    attestationData,
-                    check.params
-                ) returns (bool passed, int128 value) {
-                    if (passed) {
-                        totalScore += check.score;
-                        emit CheckPassed(ruleId, i, check.score, value);
-                    } else {
-                        emit CheckFailed(ruleId, i);
-                    }
-                } catch {
-                    emit CheckFailed(ruleId, i);
-                }
-            }
-        }
-        
-        uint8 response = maxScore > 0 
-            ? uint8((uint256(int256(totalScore)) * 100) / uint256(int256(maxScore)))
-            : 0;
-        
-        registry.validationResponse(
-            taskId,
-            response,
-            rule.templateId,
-            keccak256(bytes(attestationData)),
-            rule.description
-        );
-        
-        emit ValidationCompleted(taskId, response);
-    }
-    
-    // ============================================
-    // INTERNAL HELPERS
-    // ============================================
-    
+
     function _getAllCheckIds(uint256 ruleId) internal view returns (uint256[] memory) {
         uint256 count = checkCount[ruleId];
         uint256[] memory ids = new uint256[](count);
@@ -435,27 +308,11 @@ contract PrimusVeritasApp {
         }
         return ids;
     }
-    
-    function _toHexString(bytes32 data) internal pure returns (string memory) {
-        bytes memory hexChars = "0123456789abcdef";
-        bytes memory result = new bytes(66);
-        result[0] = '0';
-        result[1] = 'x';
-        for (uint256 i = 0; i < 32; i++) {
-            result[2 + i * 2] = hexChars[uint8(data[i]) >> 4];
-            result[3 + i * 2] = hexChars[uint8(data[i]) & 0x0f];
-        }
-        return string(result);
-    }
-    
-    // ============================================
-    // VIEW FUNCTIONS
-    // ============================================
-    
+
     function getCallbackAttempt(uint256 attemptId) external view returns (CallbackAttempt memory) {
         return callbackAttempts[attemptId];
     }
-    
+
     function getPendingValidation(bytes32 taskId) external view returns (PendingValidation memory) {
         return pendingValidations[taskId];
     }
