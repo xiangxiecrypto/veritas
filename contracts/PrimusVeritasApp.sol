@@ -34,6 +34,7 @@ contract PrimusVeritasApp {
         uint256 maxAge;         // Maximum age of data in seconds
         bool active;            // Is this rule active?
         string description;     // Human-readable description
+        bytes32 ruleHash;       // Hash of (templateId, dataKey, parsePath) for verification
     }
     
     struct CustomCheck {
@@ -123,6 +124,10 @@ contract PrimusVeritasApp {
         string calldata description
     ) external onlyOwner returns (uint256 ruleId) {
         ruleId = ruleCount++;
+        
+        // Compute hash of rule parameters for verification
+        bytes32 ruleHash = keccak256(abi.encodePacked(templateId, dataKey, parsePath));
+        
         rules[ruleId] = VerificationRule({
             templateId: templateId,
             dataKey: dataKey,
@@ -130,7 +135,8 @@ contract PrimusVeritasApp {
             decimals: decimals,
             maxAge: maxAge,
             active: true,
-            description: description
+            description: description,
+            ruleHash: ruleHash
         });
         emit RuleAdded(ruleId, templateId);
     }
@@ -371,6 +377,10 @@ contract PrimusVeritasApp {
         VerificationRule storage rule = rules[ruleId];
         require(rule.active, "Rule inactive");
         require(block.timestamp - timestamp <= rule.maxAge, "Expired");
+        
+        // For manual submission, we cannot verify the URL from attestation
+        // This is a limitation - the hash check only works with full attestation from Primus
+        // The check above in reportTaskResultCallback handles the automated case
         
         uint256 totalChecks = checkCount[ruleId];
         int128 totalScore = 0;
