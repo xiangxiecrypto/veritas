@@ -9,12 +9,24 @@ Veritas combines ERC-8004 agent identity with Primus zkTLS attestations to build
 | Contract | Address | Purpose |
 |----------|---------|---------|
 | **VeritasValidationRegistry** | `0x54be2Ce61135864D9a3c28877ab12758d027b520` | ERC-8004 compliant validation registry |
+| **PrimusVeritasApp** | `0xe413aa874A5E4043F9Fe7139Ac702Cd9Ba33046b` | Verification app with Primus SDK |
 | **Primus TaskContract** | `0xC02234058caEaA9416506eABf6Ef3122fCA939E8` | Primus zkTLS infrastructure |
 
-**Latest Deployment (2026-02-22):**
+**Latest Deployments (2026-02-22):**
+
+**VeritasValidationRegistry:**
 - Tx: `0xe174624eb5471c3b33a6312b589556cf346b508191c022643f00f526c3dfdd63`
-- Deployer: `0x89BBf3451643eef216c3A60d5B561c58F0D8adb9`
+- Address: `0x54be2Ce61135864D9a3c28877ab12758d027b520`
 - Explorer: https://sepolia.basescan.org/address/0x54be2Ce61135864D9a3c28877ab12758d027b520
+
+**PrimusVeritasApp:**
+- Tx: `0x57916e1e4e4cb9785a7136f08c8d5030b72bdc5a5b64d42f3ed1ec1264ed617b`
+- Address: `0xe413aa874A5E4043F9Fe7139Ac702Cd9Ba33046b`
+- Explorer: https://sepolia.basescan.org/address/0xe413aa874A5E4043F9Fe7139Ac702Cd9Ba33046b
+- Registry: `0x54be2Ce61135864D9a3c28877ab12758d027b520`
+- Primus Task: `0xC02234058caEaA9416506eABf6Ef3122fCA939E8`
+
+**Deployer:** `0x89BBf3451643eef216c3A60d5B561c58F0D8adb9`
 
 **Deprecated Contracts:**
 - IdentityRegistry: `0x8004A818BFB912233c491871b3d84c89A494BD9e`
