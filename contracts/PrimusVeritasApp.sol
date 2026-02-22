@@ -237,15 +237,7 @@ contract PrimusVeritasApp {
             return; // Expired
         }
 
-        // Verify attestation matches the rule parameters (BASIC CHECK)
-        // The attestation.request contains the URL that was fetched (as bytes)
-        // We hash (URL + dataKey + parsePath) and verify it matches the stored ruleHash
-        bytes32 attestationHash = keccak256(abi.encodePacked(
-            taskResult.attestation.request,  // URL in bytes
-            rule.dataKey,
-            rule.parsePath
-        ));
-        require(attestationHash == rule.ruleHash, "Rule mismatch: URL, dataKey, or parsePath don't match");
+        // NOTE: URL/parsePath verification is now done in the custom check contract
 
         // Determine which checks to run
         uint256[] memory checkIds = pending.checkIds.length > 0
@@ -263,13 +255,17 @@ contract PrimusVeritasApp {
             maxScore += check.score;
 
             try ICustomCheck(check.checkContract).validate(
-                rule.dataKey,
+                taskResult.attestation.request,
+                taskResult.attestation.responseResolve,
                 taskResult.attestation.data,
+                rule.url,
+                rule.dataKey,
+                rule.parsePath,
                 check.params
-            ) returns (bool passed, int128 value) {
+            ) returns (bool passed) {
                 if (passed) {
                     totalScore += check.score;
-                    emit CheckPassed(ruleId, checkIds[i], check.score, value);
+                    emit CheckPassed(ruleId, checkIds[i], check.score, 0);
                 } else {
                     emit CheckFailed(ruleId, checkIds[i]);
                 }

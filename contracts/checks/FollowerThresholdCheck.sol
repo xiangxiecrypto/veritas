@@ -1,114 +1,190 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity 0.8.20;
 
 import "../ICustomCheck.sol";
 
 /**
  * @title FollowerThresholdCheck
  * @notice Validates that X/Twitter follower count exceeds threshold
- * @dev Used to give high scores to agents with established social presence
+ * @dev Verifies URL template, dataKey, parsePath, and checks follower count
  */
 contract FollowerThresholdCheck is ICustomCheck {
-    
+
+    // Params: just the threshold (e.g., 500)
+    // Score is stored in PrimusVeritasApp.addCheck()
+
+    // Primus responseResolve structure
+    struct ResponseResolve {
+        string keyName;
+        string parseType;
+        string parsePath;
+        string op;
+        string value;
+    }
+
     /**
      * @notice Validate follower count against threshold
-     * @param dataKey Should be "x_followers"
-     * @param attestationData JSON string containing follower count
-     * @param params Encoded (uint256 minFollowers, int128 scoreIfPassed)
-     * @return passed True if followers >= threshold
-     * @return value The follower count extracted
+     * @dev Verifies URL, dataKey, parsePath from attestation match rule
+     * @return passed Whether followers >= threshold (score is added by PrimusVeritasApp)
      */
     function validate(
-        string memory dataKey,
-        string memory attestationData,
-        bytes memory params
-    ) external pure override returns (bool passed, int128 value) {
-        // Decode params: (uint256 minFollowers, int128 scoreWeight)
-        (uint256 minFollowers, int128 scoreWeight) = abi.decode(
-            params,
-            (uint256, int128)
+        bytes calldata attestationUrl,
+        bytes calldata attestationResponseResolve,
+        string calldata attestationData,
+        string calldata ruleUrlTemplate,
+        string calldata ruleDataKey,
+        string calldata ruleParsePath,
+        bytes calldata params
+    ) external pure override returns (bool passed) {
+        // Decode params: just minFollowers threshold
+        uint256 minFollowers = abi.decode(params, (uint256));
+
+        // Verify URL, dataKey, parsePath
+        _verifyAll(
+            attestationUrl,
+            attestationResponseResolve,
+            ruleUrlTemplate,
+            ruleDataKey,
+            ruleParsePath
         );
-        
-        // Extract follower count from attestation data
-        uint256 followerCount = extractFollowers(attestationData, dataKey);
-        
-        // Check if meets threshold
-        passed = followerCount >= minFollowers;
-        
-        // Return follower count as value (for debugging/records)
-        value = int128(uint128(followerCount));
-        
-        // Note: scoreWeight is returned through the check.score in the app
-        // passed = true means the check.score will be added to total
+
+        // Parse and verify value
+        uint256 followerCount = _parseInt(attestationData);
+
+        return followerCount >= minFollowers;
     }
-    
+
     /**
-     * @notice Extract follower count from JSON attestation data
-     * @param json The JSON string
-     * @param key The key to extract (e.g., "x_followers")
-     * @return count The follower count as uint256
+     * @notice Verify all attestation parameters match rule
      */
-    function extractFollowers(
-        string memory json,
-        string memory key
-    ) internal pure returns (uint256 count) {
-        // Find the key in JSON
-        bytes memory jsonBytes = bytes(json);
-        bytes memory keyBytes = bytes(string(abi.encodePacked('"', key, '":')));
-        
-        uint256 keyPos = findPattern(jsonBytes, keyBytes, 0);
-        require(keyPos > 0, "Key not found");
-        
-        // Find the number after the key
-        uint256 start = keyPos + keyBytes.length;
-        
-        // Skip whitespace and quotes
-        while (start < jsonBytes.length && 
-               (jsonBytes[start] == ' ' || 
-                jsonBytes[start] == '"' ||
-                jsonBytes[start] == ':')) {
-            start++;
-        }
-        
-        // Parse the number
-        count = 0;
-        for (uint256 i = start; i < jsonBytes.length; i++) {
-            bytes1 char = jsonBytes[i];
-            if (char >= '0' && char <= '9') {
-                count = count * 10 + uint256(uint8(char) - 48);
-            } else {
+    function _verifyAll(
+        bytes memory attestationUrl,
+        bytes memory responseResolveBytes,
+        string memory ruleUrlTemplate,
+        string memory ruleDataKey,
+        string memory ruleParsePath
+    ) internal pure {
+        // Verify URL
+        _verifyUrlWithEntity(attestationUrl, ruleUrlTemplate);
+
+        // Decode just the first element's keyName and parsePath
+        // ABI encoding: (ResponseResolve[]) = offset, length, (keyName_offset, parseType_offset, parsePath_offset, ...)
+        (ResponseResolve memory resolve) = abi.decode(
+            responseResolveBytes,
+            (ResponseResolve)
+        );
+
+        require(bytes(resolve.keyName).length > 0, "Empty responseResolve");
+        require(
+            keccak256(bytes(resolve.keyName)) == keccak256(bytes(ruleDataKey)),
+            "dataKey mismatch"
+        );
+        require(
+            keccak256(bytes(resolve.parsePath)) == keccak256(bytes(ruleParsePath)),
+            "parsePath mismatch"
+        );
+    }
+
+    /**
+     * @notice Verify URL matches template by extracting entity and rebuilding
+     */
+    function _verifyUrlWithEntity(
+        bytes memory attestationUrl,
+        string memory template
+    ) internal pure {
+        bytes memory urlBytes = attestationUrl;
+        bytes memory templateBytes = bytes(template);
+
+        uint256 placeholderPos = _indexOf(templateBytes, "*");
+        require(placeholderPos < templateBytes.length, "No placeholder");
+
+        require(urlBytes.length > placeholderPos, "URL too short");
+
+        // Extract entity from URL
+        uint256 entityEnd = urlBytes.length;
+        for (uint256 i = placeholderPos; i < urlBytes.length; i++) {
+            if (urlBytes[i] == '&' || urlBytes[i] == '/') {
+                entityEnd = i;
                 break;
             }
         }
-        
-        return count;
-    }
-    
-    /**
-     * @notice Find pattern in bytes
-     */
-    function findPattern(
-        bytes memory data,
-        bytes memory pattern,
-        uint256 start
-    ) internal pure returns (uint256) {
-        if (pattern.length == 0 || data.length < pattern.length) {
-            return 0;
+
+        uint256 entityLen = entityEnd - placeholderPos;
+        bytes memory entityBytes = new bytes(entityLen);
+        for (uint256 i = 0; i < entityLen; i++) {
+            entityBytes[i] = urlBytes[placeholderPos + i];
         }
-        
-        for (uint256 i = start; i <= data.length - pattern.length; i++) {
+
+        // Verify by rebuilding URL
+        string memory expected = _replacePlaceholder(template, "*", string(entityBytes));
+        require(
+            keccak256(attestationUrl) == keccak256(bytes(expected)),
+            "URL mismatch"
+        );
+    }
+
+    function _replacePlaceholder(
+        string memory template,
+        string memory placeholder,
+        string memory value
+    ) internal pure returns (string memory) {
+        bytes memory templateBytes = bytes(template);
+        bytes memory placeholderBytes = bytes(placeholder);
+        bytes memory valueBytes = bytes(value);
+
+        uint256 pos = _indexOf(templateBytes, placeholderBytes);
+        require(pos < templateBytes.length, "Placeholder not found");
+
+        bytes memory result = new bytes(
+            templateBytes.length - placeholderBytes.length + valueBytes.length
+        );
+
+        uint256 resultIndex = 0;
+        for (uint256 i = 0; i < pos; i++) {
+            result[resultIndex++] = templateBytes[i];
+        }
+        for (uint256 i = 0; i < valueBytes.length; i++) {
+            result[resultIndex++] = valueBytes[i];
+        }
+        for (uint256 i = pos + placeholderBytes.length; i < templateBytes.length; i++) {
+            result[resultIndex++] = templateBytes[i];
+        }
+
+        return string(result);
+    }
+
+    function _indexOf(
+        bytes memory haystack,
+        bytes memory needle
+    ) internal pure returns (uint256) {
+        if (needle.length == 0) return 0;
+        if (haystack.length < needle.length) return type(uint256).max;
+
+        for (uint256 i = 0; i <= haystack.length - needle.length; i++) {
             bool found = true;
-            for (uint256 j = 0; j < pattern.length; j++) {
-                if (data[i + j] != pattern[j]) {
+            for (uint256 j = 0; j < needle.length; j++) {
+                if (haystack[i + j] != needle[j]) {
                     found = false;
                     break;
                 }
             }
-            if (found) {
-                return i;
+            if (found) return i;
+        }
+
+        return type(uint256).max;
+    }
+
+    function _parseInt(string memory s) internal pure returns (uint256) {
+        bytes memory b = bytes(s);
+        uint256 result = 0;
+
+        for (uint256 i = 0; i < b.length; i++) {
+            uint8 c = uint8(b[i]);
+            if (c >= 48 && c <= 57) {
+                result = result * 10 + (c - 48);
             }
         }
-        
-        return 0;
+
+        return result;
     }
 }

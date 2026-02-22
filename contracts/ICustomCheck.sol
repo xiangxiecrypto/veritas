@@ -10,15 +10,22 @@ pragma solidity ^0.8.0;
 interface ICustomCheck {
     /**
      * @notice Validate attestation data
-     * @param dataKey The JSON key to extract from data
-     * @param attestationData JSON data from attestation (e.g., {"btcPrice":"68164.45"})
-     * @param params Custom parameters for this check (encoded by caller)
-     * @return passed Whether the check passed
-     * @return actualValue The actual value extracted (for events/logs)
+     * @param attestationUrl The URL from the attestation (actual URL fetched, as bytes)
+     * @param attestationResponseResolve The responseResolve from attestation (contains keyName, parsePath)
+     * @param attestationData The extracted data value from attestation
+     * @param ruleUrlTemplate The URL template from the rule (with * placeholder)
+     * @param ruleDataKey The dataKey from the rule
+     * @param ruleParsePath The parsePath from the rule
+     * @param params Custom parameters for this check (e.g., minFollowers threshold)
+     * @return passed Whether the check passed (score is determined by PrimusVeritasApp)
      */
     function validate(
-        string calldata dataKey,
+        bytes calldata attestationUrl,
+        bytes calldata attestationResponseResolve,
         string calldata attestationData,
+        string calldata ruleUrlTemplate,
+        string calldata ruleDataKey,
+        string calldata ruleParsePath,
         bytes calldata params
-    ) external view returns (bool passed, int128 actualValue);
+    ) external view returns (bool passed);
 }
