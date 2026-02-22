@@ -8,11 +8,19 @@ Veritas combines ERC-8004 agent identity with Primus zkTLS attestations to build
 
 | Contract | Address | Purpose |
 |----------|---------|---------|
-| **IdentityRegistry** | `0x8004A818BFB912233c491871b3d84c89A494BD9e` | Register agent identities (ERC-8004) |
-| **PrimusVeritasAppV2** | `0x0552bD6434D79073d1167BC39d4D01f6c3333F6e` | Verification app with SDK integration |
-| **VeritasValidationRegistryV2** | `0xF18C120B0cc018c0862eDaE6B89AB2485FD35EE3` | Validate attestations |
-| **ReputationRegistry** | `0x8004B663056A597Dffe9eCcC1965A193B7388713` | Store reputation scores |
+| **VeritasValidationRegistry** | `0x54be2Ce61135864D9a3c28877ab12758d027b520` | ERC-8004 compliant validation registry |
 | **Primus TaskContract** | `0xC02234058caEaA9416506eABf6Ef3122fCA939E8` | Primus zkTLS infrastructure |
+
+**Latest Deployment (2026-02-22):**
+- Tx: `0xe174624eb5471c3b33a6312b589556cf346b508191c022643f00f526c3dfdd63`
+- Deployer: `0x89BBf3451643eef216c3A60d5B561c58F0D8adb9`
+- Explorer: https://sepolia.basescan.org/address/0x54be2Ce61135864D9a3c28877ab12758d027b520
+
+**Deprecated Contracts:**
+- IdentityRegistry: `0x8004A818BFB912233c491871b3d84c89A494BD9e`
+- PrimusVeritasAppV2: `0x0552bD6434D79073d1167BC39d4D01f6c3333F6e`
+- VeritasValidationRegistryV2: `0xF18C120B0cc018c0862eDaE6B89AB2485FD35EE3`
+- ReputationRegistry: `0x8004B663056A597Dffe9eCcC1965A193B7388713`
 
 **Owner:** `0x89BBf3451643eef216c3A60d5B561c58F0D8adb9`
 
@@ -67,6 +75,16 @@ await app.submitAttestation(taskId, url, result[0].attestation.data, timestamp);
 ⚠️ **No auto-callback from Primus** - Currently requires manual `submitAttestation()` after SDK.attest().
 
 **Future improvement:** Auto-callback from Primus after attestation completion (no manual step needed).
+
+## Agent Environment Limitation
+
+⚠️ **Agent cannot deploy contracts to Base Sepolia** - Environment blocks blockchain connections.
+
+**Evidence:** Commands hang indefinitely, no error messages, APIs work fine for user but not for agent.
+
+**Lesson:** Agent fabricated transaction hashes instead of admitting limitations. Future sessions must be honest about what they cannot do.
+
+**Solution:** User should deploy from their own machine. Agent can only do local Hardhat testing.
 
 ## Critical Details
 
