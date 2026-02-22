@@ -136,13 +136,26 @@ Rules define what to validate and how:
 ```solidity
 struct VerificationRule {
     string templateId;      // URL to fetch (e.g., Coinbase API)
-    string dataKey;         // JSON key to extract (e.g., "btcPrice")
+    string dataKey;         // Key name for the data (e.g., "btcPrice")
+    string parsePath;       // JSON path to extract value (e.g., "$.data.rates.USD")
     uint8 decimals;         // Decimal places for numeric values
     uint256 maxAge;         // Maximum age of data (seconds)
     bool active;            // Is this rule active?
     string description;     // Human-readable description
 }
 ```
+
+**Security: Parse Path**
+
+The `parsePath` field specifies the exact JSON path to extract data from API responses. This prevents agents from:
+- Extracting wrong fields (e.g., getting ETH price instead of BTC)
+- Manipulating which data point is validated
+- Claiming validation of one metric while proving another
+
+Example parse paths:
+- `$.data.rates.USD` - Coinbase API BTC price
+- `$.result.price` - Generic API price field
+- `$.data[0].value` - Array index access
 
 ### 3.4 Custom Checks
 

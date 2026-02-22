@@ -56,8 +56,9 @@ export interface AgentRegistration {
 }
 
 export interface ValidationRule {
-  templateId: string;  // URL
-  dataKey: string;
+  templateId: string;  // URL to fetch data from
+  dataKey: string;     // Key name for the data
+  parsePath: string;   // JSON path to extract value (e.g., "$.data.rates.USD")
   decimals: number;
   maxAge: number;
   description: string;

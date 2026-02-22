@@ -27,12 +27,13 @@ contract PrimusVeritasApp {
     IPrimusTask public immutable primusTask;
     
     struct VerificationRule {
-        string templateId;
-        string dataKey;
-        uint8 decimals;
-        uint256 maxAge;
-        bool active;
-        string description;
+        string templateId;      // URL to fetch data from
+        string dataKey;         // Key name for the data (e.g., "btcPrice")
+        string parsePath;       // JSON path to extract value (e.g., "$.data.rates.USD")
+        uint8 decimals;         // Decimal places for numeric values
+        uint256 maxAge;         // Maximum age of data in seconds
+        bool active;            // Is this rule active?
+        string description;     // Human-readable description
     }
     
     struct CustomCheck {
@@ -116,6 +117,7 @@ contract PrimusVeritasApp {
     function addRule(
         string calldata templateId,
         string calldata dataKey,
+        string calldata parsePath,
         uint8 decimals,
         uint256 maxAge,
         string calldata description
@@ -124,6 +126,7 @@ contract PrimusVeritasApp {
         rules[ruleId] = VerificationRule({
             templateId: templateId,
             dataKey: dataKey,
+            parsePath: parsePath,
             decimals: decimals,
             maxAge: maxAge,
             active: true,

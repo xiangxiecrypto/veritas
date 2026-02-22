@@ -87,11 +87,30 @@ bytes32 taskId = app.requestValidation(
 );
 ```
 
+**Security Feature: Parse Path Validation**
+
+Rules include a `parsePath` to prevent data manipulation:
+
+```solidity
+// Rule defines exactly which field to extract
+app.addRule(
+    "https://api.coinbase.com/v2/exchange-rates?currency=BTC",  // URL
+    "btcPrice",                                                  // Data key
+    "$.data.rates.USD",                                         // Parse path ← Security!
+    2,                                                          // Decimals
+    3600,                                                       // Max age
+    "BTC Price Check"
+);
+```
+
+This ensures agents extract the **correct field** from API responses and cannot manipulate which data point is used for validation.
+
 **How it works:**
 1. Agent performs work (e.g., fetches BTC price from Coinbase)
 2. Primus network generates zkTLS proof
-3. Proof is verified on-chain
-4. Score is calculated based on validation rules
+3. **Parse path ensures correct field is extracted** (`$.data.rates.USD`)
+4. Proof is verified on-chain
+5. Score is calculated based on validation rules
 
 ### 3. Reputation Layer (ERC-8004)
 
