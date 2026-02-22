@@ -27,14 +27,14 @@ contract PrimusVeritasApp {
     IPrimusTask public immutable primusTask;
     
     struct VerificationRule {
-        string templateId;      // URL to fetch data from
+        string url;             // URL to fetch data from (e.g., "https://api.coinbase.com/v2/exchange-rates?currency=BTC")
         string dataKey;         // Key name for the data (e.g., "btcPrice")
         string parsePath;       // JSON path to extract value (e.g., "$.data.rates.USD")
         uint8 decimals;         // Decimal places for numeric values
         uint256 maxAge;         // Maximum age of data in seconds
         bool active;            // Is this rule active?
         string description;     // Human-readable description
-        bytes32 ruleHash;       // Hash of (templateId, dataKey, parsePath) for verification
+        bytes32 ruleHash;       // Hash of (url, dataKey, parsePath) for verification
     }
     
     struct CustomCheck {
@@ -73,7 +73,7 @@ contract PrimusVeritasApp {
     uint256 public callbackAttemptCount;
     
     // Events
-    event RuleAdded(uint256 indexed ruleId, string templateId);
+    event RuleAdded(uint256 indexed ruleId, string url);
     event CheckAdded(uint256 indexed ruleId, uint256 indexed checkId, int128 score);
     event ValidationRequested(bytes32 indexed taskId, uint256 indexed ruleId, uint256 indexed agentId);
     event CallbackReceived(bytes32 indexed taskId, address caller, address attestor);
@@ -116,7 +116,7 @@ contract PrimusVeritasApp {
     // ============================================
     
     function addRule(
-        string calldata templateId,
+        string calldata url,
         string calldata dataKey,
         string calldata parsePath,
         uint8 decimals,
@@ -124,12 +124,12 @@ contract PrimusVeritasApp {
         string calldata description
     ) external onlyOwner returns (uint256 ruleId) {
         ruleId = ruleCount++;
-        
+
         // Compute hash of rule parameters for verification
-        bytes32 ruleHash = keccak256(abi.encodePacked(templateId, dataKey, parsePath));
-        
+        bytes32 ruleHash = keccak256(abi.encodePacked(url, dataKey, parsePath));
+
         rules[ruleId] = VerificationRule({
-            templateId: templateId,
+            url: url,
             dataKey: dataKey,
             parsePath: parsePath,
             decimals: decimals,
@@ -138,7 +138,7 @@ contract PrimusVeritasApp {
             description: description,
             ruleHash: ruleHash
         });
-        emit RuleAdded(ruleId, templateId);
+        emit RuleAdded(ruleId, url);
     }
     
     function addCheck(
@@ -198,7 +198,7 @@ contract PrimusVeritasApp {
         registry.validationRequest(
             address(this),      // validatorAddress (this contract validates)
             agentId,            // agentId being validated
-            rule.templateId,    // requestURI (URL for attestation data)
+            rule.url,           // requestURI (URL for attestation data)
             taskId              // requestHash (unique identifier)
         );
         
@@ -322,7 +322,7 @@ contract PrimusVeritasApp {
         try registry.validationResponse(
             taskId,                                           // requestHash
             response,                                         // response (0-100 score)
-            rule.templateId,                                  // responseURI (URL used for attestation)
+            rule.url,                                         // responseURI (URL used for attestation)
             keccak256(bytes(taskResult.attestation.data)),   // responseHash (commitment to data)
             rule.description                                  // tag (description of validation)
         ) {

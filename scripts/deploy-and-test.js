@@ -47,9 +47,9 @@ async function main() {
   await priceCheck.deployed();
 
   // Add rule with parsePath for security
-  const templateId = "https://api.coinbase.com/v2/exchange-rates?currency=BTC";
+  const url = "https://api.coinbase.com/v2/exchange-rates?currency=BTC";
   const parsePath = "$.data.rates.USD";  // JSON path to extract BTC price
-  await app.addRule(templateId, "btcPrice", parsePath, 2, 3600, "BTC Price");
+  await app.addRule(url, "btcPrice", parsePath, 2, 3600, "BTC Price");
   
   const params = ethers.utils.defaultAbiCoder.encode(['int128','int128'], [6000000,10000000]);
   await app.addCheck(0, priceCheck.address, params, 100);

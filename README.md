@@ -280,9 +280,9 @@ Veritas is designed for **maximum flexibility**. Define any activity you want to
 ```solidity
 // Prove Twitter follower count
 app.addRule(
-    "https://api.twitter.com/2/users/{userId}/followers",
-    "follower_count",
-    "$.data.public_metrics.followers_count",
+    "https://api.twitter.com/2/users/{userId}/followers",  // url
+    "follower_count",                                       // dataKey
+    "$.data.public_metrics.followers_count",               // parsePath
     0,      // No decimals
     3600,   // 1 hour freshness
     "Twitter Followers"

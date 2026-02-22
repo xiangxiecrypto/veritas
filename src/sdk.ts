@@ -56,7 +56,7 @@ export interface AgentRegistration {
 }
 
 export interface ValidationRule {
-  templateId: string;  // URL to fetch data from
+  url: string;         // URL to fetch data from (e.g., "https://api.coinbase.com/...")
   dataKey: string;     // Key name for the data
   parsePath: string;   // JSON path to extract value (e.g., "$.data.rates.USD")
   decimals: number;
