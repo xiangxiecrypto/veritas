@@ -8,8 +8,10 @@ Veritas combines ERC-8004 agent identity with Primus zkTLS attestations to build
 
 | Contract | Address | Purpose |
 |----------|---------|---------|
-| **VeritasValidationRegistry** | `0x54be2Ce61135864D9a3c28877ab12758d027b520` | ERC-8004 compliant validation registry |
-| **PrimusVeritasApp** | `0xe413aa874A5E4043F9Fe7139Ac702Cd9Ba33046b` | Verification app with Primus SDK |
+| **VeritasValidationRegistry** | `0xAeFdE0707014b6540128d3835126b53F073fEd40` | ERC-8004 compliant validation registry |
+| **PrimusVeritasApp** | `0xa21CC240ed059eC4b31e45559865Af73C0CCA6Da` | Verification app with Primus SDK |
+| **FollowerThresholdCheck** | `0xDebe3ddf4854b7198dd1DCcDFc70e920000D1E52` | Generic follower threshold check |
+| **Identity Registry** | `0x8004A818BFB912233c491871b3d84c89A494BD9e` | Existing ERC-8004 identity registry |
 | **Primus TaskContract** | `0xC02234058caEaA9416506eABf6Ef3122fCA939E8` | Primus zkTLS infrastructure |
 
 **Latest Deployments (2026-02-22):**
@@ -40,13 +42,9 @@ Veritas combines ERC-8004 agent identity with Primus zkTLS attestations to build
 
 **Deployer:** `0x89BBf3451643eef216c3A60d5B561c58F0D8adb9`
 
-**Deprecated Contracts:**
-- IdentityRegistry: `0x8004A818BFB912233c491871b3d84c89A494BD9e`
-- PrimusVeritasAppV2: `0x0552bD6434D79073d1167BC39d4D01f6c3333F6e`
-- VeritasValidationRegistryV2: `0xF18C120B0cc018c0862eDaE6B89AB2485FD35EE3`
-- ReputationRegistry: `0x8004B663056A597Dffe9eCcC1965A193B7388713`
-
 **Owner:** `0x89BBf3451643eef216c3A60d5B561c58F0D8adb9`
+
+**Note:** Always use the existing ERC-8004 IdentityRegistry at `0x8004A818BFB912233c491871b3d84c89A494BD9e`. Never deploy new identity registries.
 
 ## Two-Step Flow
 
