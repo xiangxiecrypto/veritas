@@ -19,12 +19,24 @@ Veritas combines ERC-8004 agent identity with Primus zkTLS attestations to build
 - Address: `0x54be2Ce61135864D9a3c28877ab12758d027b520`
 - Explorer: https://sepolia.basescan.org/address/0x54be2Ce61135864D9a3c28877ab12758d027b520
 
-**PrimusVeritasApp:**
-- Tx: `0x57916e1e4e4cb9785a7136f08c8d5030b72bdc5a5b64d42f3ed1ec1264ed617b`
-- Address: `0xe413aa874A5E4043F9Fe7139Ac702Cd9Ba33046b`
-- Explorer: https://sepolia.basescan.org/address/0xe413aa874A5E4043F9Fe7139Ac702Cd9Ba33046b
+**PrimusVeritasApp (NEW - Generic Version):**
+- Tx: `0xc01048d6ba6e11d3da7fd9f7b89abac31756db9ee88452bd883e3b5e05caa125`
+- Address: `0xA1ea3a656962574C3c6f7840de4e6C45FE26B8A0`
+- Explorer: https://sepolia.basescan.org/address/0xA1ea3a656962574C3c6f7840de4e6C45FE26B8A0
 - Registry: `0x54be2Ce61135864D9a3c28877ab12758d027b520`
 - Primus Task: `0xC02234058caEaA9416506eABf6Ef3122fCA939E8`
+- Features: Template-based URLs, generic validation
+
+**FollowerThresholdCheck (NEW):**
+- Tx: `0x5813def9acb0fe93b33ed4ad9ae1cdf7b3fcc40092027dfbe4e7a1d376f61eaf`
+- Address: `0xDebe3ddf4854b7198dd1DCcDFc70e920000D1E52`
+- Explorer: https://sepolia.basescan.org/address/0xDebe3ddf4854b7198dd1DCcDFc70e920000D1E52
+- Features: Verifies URL, dataKey, parsePath; generic threshold check
+
+**PrimusVeritasApp (Deprecated):**
+- Tx: `0x57916e1e4e4cb9785a7136f08c8d5030b72bdc5a5b64d42f3ed1ec1264ed617b`
+- Address: `0xe413aa874A5E4043F9Fe7139Ac702Cd9Ba33046b`
+- Note: Old version with hardcoded verification
 
 **Deployer:** `0x89BBf3451643eef216c3A60d5B561c58F0D8adb9`
 
