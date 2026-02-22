@@ -21,7 +21,11 @@ Traditional approaches fail:
 
 ## 💡 The Solution
 
-Veritas provides **cryptographic proof of agent activities** through a seamless three-layer stack:
+Veritas provides **cryptographic proof of agent activities** through a seamless, **fully customizable** three-layer stack:
+
+> **"If you can fetch it from an API, you can prove it on-chain."**
+
+Define your own rules. Create your own checks. Prove any activity.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -48,6 +52,8 @@ Veritas provides **cryptographic proof of agent activities** through a seamless 
 ```
 
 ## ✨ What You Can Prove
+
+**Literally anything an AI agent does.** If it can be fetched from an API, Veritas can prove it.
 
 ### 📊 Trading Activity
 ```solidity
@@ -265,6 +271,147 @@ const proof = await sdk.getActivityProof(agentId, taskId);
 // { score: 95, timestamp: 1699123456, data: "..." }
 ```
 
+## 🔧 Fully Customizable Rules & Checks
+
+Veritas is designed for **maximum flexibility**. Define any activity you want to prove with custom rules and validation logic.
+
+### Define Any Rule
+
+```solidity
+// Prove Twitter follower count
+app.addRule(
+    "https://api.twitter.com/2/users/{userId}/followers",
+    "follower_count",
+    "$.data.public_metrics.followers_count",
+    0,      // No decimals
+    3600,   // 1 hour freshness
+    "Twitter Followers"
+);
+
+// Prove GitHub commit
+app.addRule(
+    "https://api.github.com/repos/{owner}/{repo}/commits/{sha}",
+    "commit_author",
+    "$.commit.author.name",
+    0,
+    86400,  // 1 day
+    "GitHub Commit"
+);
+
+// Prove weather data
+app.addRule(
+    "https://api.weather.com/v1/current?city={city}",
+    "temperature",
+    "$.current.temp_c",
+    1,
+    600,    // 10 minutes
+    "Temperature Proof"
+);
+
+// Prove any API response...
+```
+
+**Any URL. Any JSON path. Any validation logic.**
+
+### Create Any Check
+
+```solidity
+// Check 1: Price must be in range
+contract PriceRangeCheck is ICustomCheck {
+    function validate(string memory dataKey, string memory data, bytes memory params) 
+        external override returns (bool passed, int128 value) 
+    {
+        (int128 min, int128 max) = abi.decode(params, (int128, int128));
+        value = extractValue(data, dataKey);
+        passed = (value >= min && value <= max);
+    }
+}
+
+// Check 2: String must match pattern
+contract RegexCheck is ICustomCheck {
+    function validate(string memory dataKey, string memory data, bytes memory params)
+        external override returns (bool passed, int128 value)
+    {
+        string memory pattern = abi.decode(params, (string));
+        string memory extracted = extractString(data, dataKey);
+        passed = matchRegex(extracted, pattern);
+        value = passed ? 1 : 0;
+    }
+}
+
+// Check 3: Timestamp must be recent
+contract FreshnessCheck is ICustomCheck {
+    function validate(string memory dataKey, string memory data, bytes memory params)
+        external override returns (bool passed, int128 value)
+    {
+        uint256 maxAge = abi.decode(params, (uint256));
+        uint256 timestamp = extractTimestamp(data, dataKey);
+        passed = (block.timestamp - timestamp <= maxAge);
+        value = int128(uint128(block.timestamp - timestamp));
+    }
+}
+
+// Check 4: List must contain item
+contract ContainsCheck is ICustomCheck {
+    function validate(string memory dataKey, string memory data, bytes memory params)
+        external override returns (bool passed, int128 value)
+    {
+        string memory target = abi.decode(params, (string));
+        string[] memory items = extractArray(data, dataKey);
+        passed = contains(items, target);
+        value = passed ? 1 : 0;
+    }
+}
+
+// ...add any check you need
+```
+
+**Composable, reusable, extensible.**
+
+### Combine Multiple Checks
+
+```solidity
+// Prove BTC price with multiple validations
+await app.addCheck(ruleId, priceRangeCheck.address, 
+    encode(6000000, 10000000),  // $60k-$100k
+    60  // 60% weight
+);
+
+await app.addCheck(ruleId, freshnessCheck.address,
+    encode(300),  // < 5 minutes old
+    40  // 40% weight
+);
+
+// Final score = weighted average of all checks
+```
+
+### Real-World Example: DeFi Agent
+
+```solidity
+// Prove a complex trading activity
+app.addRule(
+    "https://api.1inch.io/v5.0/1/swap",
+    "swap_result",
+    "$.tx.data",
+    18,
+    300,
+    "1inch Swap Execution"
+);
+
+// Checks:
+// 1. Slippage < 1%
+// 2. Gas price < 50 gwei
+// 3. Execution time < 30s
+// 4. Token received > expected minimum
+
+await app.addCheck(ruleId, slippageCheck, encode(100), 40);    // 40%
+await app.addCheck(ruleId, gasPriceCheck, encode(50e9), 30);   // 30%
+await app.addCheck(ruleId, timeCheck, encode(30), 20);         // 20%
+await app.addCheck(ruleId, minOutCheck, encode(minAmount), 10);// 10%
+```
+
+**Any activity. Any validation. Any complexity.**
+
 ## 🔐 Security Features
 
 ### Parse Path Validation
@@ -283,12 +430,15 @@ await taskContract.submitTask(
 ```
 Ensures callback is set correctly for auto-verification.
 
-### Custom Checks
+### Custom Checks (Pluggable)
 ```solidity
-// Pluggable validation logic
-PriceRangeCheck: value must be $60k-$100k
-ThresholdCheck: value must exceed threshold
-// Add your own checks
+// Use built-in checks or create your own
+PriceRangeCheck    // Numeric range validation
+ThresholdCheck     // Min/max thresholds
+RegexCheck         // Pattern matching
+FreshnessCheck     // Timestamp validation
+ContainsCheck      // Array membership
+// ...or implement ICustomCheck
 ```
 
 ## 📚 Documentation
