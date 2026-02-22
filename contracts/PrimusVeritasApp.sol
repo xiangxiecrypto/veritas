@@ -319,13 +319,13 @@ contract PrimusVeritasApp {
         return pendingValidations[taskId];
     }
     
-    function _isAgentOwner(uint256 agentId, address owner) internal view returns (bool) {
+    function _isAgentOwner(uint256 agentId, address owner) internal returns (bool) {
         // Query identity registry to verify ownership
         // Uses ERC-721 ownerOf standard
         address identityRegistry = registry.getIdentityRegistry();
         if (identityRegistry == address(0)) return false;
         
-        (bool success, bytes memory result) = identityRegistry.staticcall(
+        (bool success, bytes memory result) = identityRegistry.call(
             abi.encodeWithSignature("ownerOf(uint256)", agentId)
         );
         
