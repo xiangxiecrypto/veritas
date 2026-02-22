@@ -2,18 +2,225 @@
 
 > **Verifiable Truth for the Agentic Economy**
 
-Veritas Protocol enables AI agents to prove their capabilities, build verifiable reputation, and establish trust through cryptographic attestations. By combining ERC-8004 identity standards with Primus zkTLS, Veritas creates a trust layer for the emerging agentic economy.
+Veritas Protocol enables AI agents to **cryptographically prove their activities**—trades, computations, data fetches, service deliveries—creating an immutable record of verifiable work on-chain.
 
-## 🌟 Vision
+## 🚀 The Problem
 
-As AI agents become autonomous economic actors—trading assets, executing contracts, and providing services—there's a critical need for **verifiable trust**. Veritas addresses this by enabling:
+AI agents are becoming autonomous economic actors:
+- Trading billions in DeFi
+- Running complex computations  
+- Fetching critical data for smart contracts
+- Providing services to users
 
-- **Provenance**: Agents can prove their actions and outputs
-- **Accountability**: On-chain reputation that can't be faked
-- **Interoperability**: Standardized trust signals across platforms
-- **Composability**: Reputation that builds across services
+**But how do you verify an AI actually did what it claims?**
 
-## 🚀 Quick Start
+Traditional approaches fail:
+- ❌ Self-reported logs (easily faked)
+- ❌ Centralized audits (expensive, slow)
+- ❌ Social proofs (unreliable)
+
+## 💡 The Solution
+
+Veritas provides **cryptographic proof of agent activities** through a seamless three-layer stack:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        VERITAS PROTOCOL                              │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐      │
+│  │   Activity      │  │   Validation    │  │   Verification  │      │
+│  │   Recording     │  │   (Primus)      │  │   (On-Chain)    │      │
+│  │                 │  │                 │  │                 │      │
+│  │ • Agent Registry│  │ • zkTLS Proofs  │  │ • Proof Storage │      │
+│  │ • Metadata      │  │ • API Attests   │  │ • Score Calc    │      │
+│  │ • Ownership     │  │ • Auto-Callback │  │ • Queryable     │      │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘      │
+│          │                   │                   │                   │
+│          ▼                   ▼                   ▼                   │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │              "Prove any agent activity,                      │    │
+│  │               store it on-chain,                             │    │
+│  │               query it forever"                              │    │
+│  └─────────────────────────────────────────────────────────────┘    │
+│                                                                       │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+## ✨ What You Can Prove
+
+### 📊 Trading Activity
+```solidity
+// Prove an AI agent executed a trade on Coinbase
+app.addRule(
+    "https://api.exchange.coinbase.com/orders/{orderId}",
+    "filled_size",
+    "$.filled_size",
+    8,      // decimals
+    300,    // max age 5 min
+    "Trade Execution Proof"
+);
+
+// Result: Cryptographic proof that order was filled
+// Stored on-chain, verifiable forever
+```
+
+### 🔮 Oracle Data
+```solidity
+// Prove price data came from Binance at specific time
+app.addRule(
+    "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT",
+    "price", 
+    "$.price",
+    2,
+    60,     // 1 minute freshness
+    "Binance BTC Price"
+);
+
+// Result: zkTLS proof of price at timestamp
+// DeFi protocols can verify before using
+```
+
+### 🖥️ Computation Results
+```solidity
+// Prove ML inference was run on specific data
+app.addRule(
+    "https://ml-service.com/inference/{jobId}",
+    "prediction",
+    "$.result.prediction",
+    6,
+    600,
+    "ML Inference Result"
+);
+
+// Result: Proof that model produced specific output
+// Audit trail for AI decisions
+```
+
+### 🛠️ Service Delivery
+```solidity
+// Prove API service responded correctly
+app.addRule(
+    "https://api.service.com/health",
+    "status",
+    "$.status",
+    0,
+    30,
+    "Service Health Check"
+);
+
+// Result: Uptime proof for SLA enforcement
+```
+
+## 🏗️ Architecture
+
+### Layer 1: Activity Recording (ERC-8004)
+
+Agents register as on-chain entities with standardized metadata:
+
+```solidity
+// Register your agent
+uint256 agentId = identityRegistry.register(agentURI);
+
+// Store capabilities, endpoints, services
+{
+  "name": "AlphaTrader",
+  "services": ["market-analysis", "auto-trading"],
+  "endpoint": "https://api.alphatrader.com"
+}
+```
+
+### Layer 2: Validation (Primus zkTLS)
+
+Cryptographic proof generation for any API call:
+
+```javascript
+// Request proof of activity
+const taskId = await app.requestValidation({
+    agentId: agentId,
+    ruleId: 0,              // Which activity to prove
+    attestorCount: 1        // How many attestors
+});
+
+// Primus network:
+// 1. Calls the API (e.g., Coinbase)
+// 2. Generates zkTLS proof
+// 3. Returns attestation data
+```
+
+### Layer 3: Verification (On-Chain)
+
+Smart contracts verify proofs and store results:
+
+```solidity
+// Automatic callback when proof is ready
+function reportTaskResultCallback(...) {
+    // 1. Verify attestation data
+    // 2. Extract value using parsePath
+    // 3. Run custom checks
+    // 4. Calculate score
+    // 5. Store permanently
+}
+```
+
+## 🔥 Why Veritas?
+
+| Traditional | Veritas |
+|-------------|---------|
+| "Trust me bro" | Cryptographic proof |
+| Expensive audits | Automated validation |
+| Opaque black box | Transparent, verifiable |
+| Centralized trust | Decentralized verification |
+| Easy to fake | Impossible to forge |
+
+## 🎯 Use Cases
+
+### For DeFi Protocols
+**Prove liquidity operations**
+```javascript
+// Before accepting a deposit, verify the agent
+// actually deposited funds to the pool
+const proof = await verifyActivity(agentId, "deposit");
+if (proof.score >= 95) {
+    acceptDeposit(agentId, amount);
+}
+```
+
+### For AI Marketplaces
+**Prove service quality**
+```javascript
+// Customers verify agent completed task
+// before releasing payment
+const completed = await verifyActivity(agentId, taskId);
+if (completed) {
+    releasePayment(agentId, reward);
+}
+```
+
+### For Data Providers
+**Prove data freshness**
+```javascript
+// Smart contracts verify price data
+// came from Binance < 1 minute ago
+const { score, timestamp } = await verifyActivity(
+    agentId, 
+    "binance-price"
+);
+if (score >= 90 && timestamp > now - 60) {
+    usePrice(data);
+}
+```
+
+### For Compliance
+**Immutable audit trail**
+```javascript
+// Every action by regulated AI agents
+// is permanently recorded on-chain
+const history = await getActivityHistory(agentId);
+// Perfect for regulatory compliance
+```
+
+## 📦 Quick Start
 
 ```bash
 # Install dependencies
@@ -23,274 +230,89 @@ npm install
 npx hardhat run scripts/deploy-and-test.js --network baseSepolia
 ```
 
-## 📖 How It Works
-
-### The Trust Problem
-
-In the agentic economy, how do you trust an AI agent to:
-- Execute a trade correctly?
-- Provide accurate data?
-- Complete a service as promised?
-
-Traditional solutions rely on:
-- Centralized reputation systems (easily gamed)
-- Social proofs (unreliable)
-- Manual verification (not scalable)
-
-### The Veritas Solution
-
-Veritas provides **cryptographic verification** through a three-layer architecture:
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    VERITAS PROTOCOL                          │
-├─────────────────────────────────────────────────────────────┤
-│                                                               │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐  │
-│  │   IDENTITY   │───→│  VALIDATION  │───→│  REPUTATION  │  │
-│  │   (ERC-8004) │    │ (Primus zkTLS)│    │  (On-Chain)  │  │
-│  └──────────────┘    └──────────────┘    └──────────────┘  │
-│         │                   │                   │            │
-│         ▼                   ▼                   ▼            │
-│    Agent Registry      Proof of Work       Trust Score       │
-│    NFT (ERC-721)      zkTLS Attestation   Queryable History  │
-│                                                               │
-└─────────────────────────────────────────────────────────────┘
-```
-
-## 🏗️ Architecture
-
-### 1. Identity Layer (ERC-8004)
-
-Every agent gets a unique on-chain identity:
-
-```solidity
-// Register an agent
-uint256 agentId = identityRegistry.register(agentURI);
-```
-
-- **ERC-721 NFT** representing the agent
-- **Metadata** stored on-chain (name, description, capabilities)
-- **Transferable ownership** of the agent identity
-
-### 2. Validation Layer (Primus zkTLS)
-
-Agents prove their work through cryptographic attestations:
-
-```solidity
-// Request validation
-bytes32 taskId = app.requestValidation(
-    agentId,      // Which agent
-    ruleId,       // What to validate
-    checkIds,     // Which checks to run
-    attestorCount // How many attestors
-);
-```
-
-**Security Feature: Parse Path Validation**
-
-Rules include a `parsePath` to prevent data manipulation:
-
-```solidity
-// Rule defines exactly which field to extract
-app.addRule(
-    "https://api.coinbase.com/v2/exchange-rates?currency=BTC",  // URL
-    "btcPrice",                                                  // Data key
-    "$.data.rates.USD",                                         // Parse path ← Security!
-    2,                                                          // Decimals
-    3600,                                                       // Max age
-    "BTC Price Check"
-);
-```
-
-This ensures agents extract the **correct field** from API responses and cannot manipulate which data point is used for validation.
-
-**How it works:**
-1. Agent performs work (e.g., fetches BTC price from Coinbase)
-2. Primus network generates zkTLS proof
-3. **Parse path ensures correct field is extracted** (`$.data.rates.USD`)
-4. Proof is verified on-chain
-5. Score is calculated based on validation rules
-
-### 3. Reputation Layer (ERC-8004)
-
-Validation results are stored in a queryable registry:
-
-```solidity
-// Get validation status
-(address validator, uint256 agent, uint8 score, , ,) = 
-    registry.getValidationStatus(taskId);
-
-// Get aggregated stats
-(uint64 count, uint8 average) = 
-    registry.getSummary(agentId, validators, tag);
-```
-
-## 💡 Use Cases
-
-### 1. AI Trading Agents
-
-**Problem:** How do you trust an AI to manage your portfolio?
-
-**Veritas Solution:**
-- Agent registers with trading strategy metadata
-- Every trade is validated via zkTLS (exchange APIs)
-- On-chain reputation tracks win/loss ratio
-- Users can query agent's track record before delegating funds
-
-### 2. Data Oracle Agents
-
-**Problem:** How do you verify data from AI-powered oracles?
-
-**Veritas Solution:**
-- Agent commits to data sources (e.g., Coinbase, Binance)
-- Every data point is cryptographically attested
-- Users can verify data provenance on-chain
-- Stake slashing for incorrect data
-
-### 3. Service Marketplaces
-
-**Problem:** How do you verify AI service quality?
-
-**Veritas Solution:**
-- Service agents build reputation through completed tasks
-- Customers validate service delivery via zkTLS
-- Reputation becomes composable across marketplaces
-- Quality agents get priority matching
-
-### 4. Autonomous Organizations
-
-**Problem:** How do AI agents make trusted decisions collectively?
-
-**Veritas Solution:**
-- Voting power weighted by reputation scores
-- Decisions validated via multi-party attestations
-- Transparent on-chain governance
-- Immutable decision history
-
-## 🔧 Technical Implementation
-
-### Core Contracts
-
-| Contract | Purpose |
-|----------|---------|
-| `PrimusVeritasApp.sol` | Main validation orchestrator |
-| `VeritasValidationRegistry.sol` | ERC-8004 validation registry |
-| `IdentityRegistry` | ERC-8004 agent identities |
-| `PriceRangeCheck.sol` | Custom validation checks |
-
-### Validation Flow
-
-```
-User Request
-    │
-    ▼
-┌─────────────────┐
-│ 1. Submit Task  │────→ TaskContract.submitTask()
-│    (Direct)     │       Sets callback to app
-└─────────────────┘
-    │
-    ▼
-┌─────────────────┐
-│ 2. Attest       │────→ Primus SDK attest()
-│    (Off-chain)  │       Generates zkTLS proof
-└─────────────────┘
-    │
-    ▼
-┌─────────────────┐
-│ 3. Callback     │────→ App.reportTaskResultCallback()
-│    (Auto)       │       Processes attestation
-└─────────────────┘
-    │
-    ▼
-┌─────────────────┐
-│ 4. Validate     │────→ Custom checks run
-│    (On-chain)   │       Score calculated
-└─────────────────┘
-    │
-    ▼
-┌─────────────────┐
-│ 5. Record       │────→ Registry.validationResponse()
-│    (On-chain)   │       Result stored
-└─────────────────┘
-    │
-    ▼
-Reputation Updated ✓
-```
-
-### Key Features
-
-- **Direct TaskContract Calls**: Bypasses SDK bug, sets callback correctly
-- **Auto-Callback**: Primus calls contract automatically when attestation completes
-- **Custom Checks**: Pluggable validation logic (price ranges, thresholds, etc.)
-- **ERC-8004 Compliant**: Standard interface for identity and validation
-- **Composability**: Reputation builds across multiple validations
-
-## 📚 Documentation
-
-- [Architecture](./docs/ARCHITECTURE.md) - System design and components
-- [Protocol Design](./docs/PROTOCOL_DESIGN.md) - Detailed protocol specification
-- [Workflow](./docs/WORKFLOW.md) - Step-by-step user flows
-- [Custom Checks](./docs/CUSTOM_CHECK_DESIGN.md) - Creating validation checks
-
-## 🌐 Contract Addresses (Base Sepolia)
-
-| Contract | Address |
-|----------|---------|
-| Primus Task | `0xC02234058caEaA9416506eABf6Ef3122fCA939E8` |
-| Identity Registry | `0x8004A818BFB912233c491871b3d84c89A494BD9e` |
-| Reputation Registry | `0x8004B663056A597Dffe9eCcC1965A193B7388713` |
-
-## 🤝 Integration
-
-### For Agent Developers
+## 💻 Example: Prove a Trade
 
 ```javascript
 import { VeritasSDK } from './src/sdk';
 
-const sdk = new VeritasSDK({
-  provider,
-  signer,
-  network: 'sepolia'
-});
+const sdk = new VeritasSDK({ signer, network: 'sepolia' });
 
-// 1. Register agent
+// 1. Register your trading agent
 const agentId = await sdk.registerAgent({
-  name: "MyTradingBot",
-  description: "AI-powered trading agent"
+  name: "HighFreqTrader",
+  services: [{ name: "Arbitrage", endpoint: "..." }]
 });
 
-// 2. Request validation
-const taskId = await sdk.requestValidation(agentId, ruleId);
+// 2. Define what to prove
+await sdk.addRule({
+  templateId: "https://api.exchange.com/trades/{tradeId}",
+  dataKey: "filledAmount",
+  parsePath: "$.filled_amount",  // Security: exact field
+  decimals: 8,
+  maxAge: 60,
+  description: "Trade Execution"
+});
 
-// 3. Build reputation
-const reputation = await sdk.getReputation(agentId);
+// 3. Request proof
+const taskId = await sdk.requestValidation(agentId, 0);
+
+// 4. Wait for proof
+const result = await sdk.waitForAttestation(taskId);
+console.log(`Trade proven! Score: ${result.score}/100`);
+
+// 5. Anyone can verify
+const proof = await sdk.getActivityProof(agentId, taskId);
+// { score: 95, timestamp: 1699123456, data: "..." }
 ```
 
-### For Platform Integrators
+## 🔐 Security Features
 
+### Parse Path Validation
+```solidity
+// Rules specify exact JSON path
+parsePath: "$.data.rates.USD"  // Must extract this field
+```
+Prevents agents from manipulating which data is validated.
+
+### Direct TaskContract Calls
 ```javascript
-// Query agent reputation before allowing actions
-const { count, average } = await registry.getSummary(
-  agentId,
-  [],     // All validators
-  "trading"  // Filter by tag
+// Bypass SDK bug by calling contract directly
+await taskContract.submitTask(
+  sender, templateId, attestorCount, token, callback, {value: fee}
 );
-
-if (average > 80) {
-  // Allow high-value transactions
-}
 ```
+Ensures callback is set correctly for auto-verification.
+
+### Custom Checks
+```solidity
+// Pluggable validation logic
+PriceRangeCheck: value must be $60k-$100k
+ThresholdCheck: value must exceed threshold
+// Add your own checks
+```
+
+## 📚 Documentation
+
+- [Protocol Design](./docs/PROTOCOL_DESIGN.md) - Deep dive into architecture
+- [Workflow](./docs/WORKFLOW.md) - Step-by-step guides
+- [Custom Checks](./docs/CUSTOM_CHECK_DESIGN.md) - Create validation logic
+
+## 🌐 Deployed Contracts (Base Sepolia)
+
+| Contract | Address |
+|----------|---------|
+| Primus Task | `0xC02234058caEaA9416506eABf6Ef3122fCA939E8` |
+| VeritasValidationRegistry | `0x257DC4B38066840769EeA370204AD3724ddb0836` |
 
 ## 🛣️ Roadmap
 
-- [x] Core validation protocol
-- [x] ERC-8004 compliance
-- [x] Primus zkTLS integration
+- [x] Core proof generation
+- [x] Auto-callback mechanism
+- [x] Custom validation checks
+- [x] Parse path security
 - [ ] Mainnet deployment
-- [ ] SDK improvements
-- [ ] Governance token
-- [ ] Staking and slashing
+- [ ] Multi-chain proofs
+- [ ] Governance integration
 
 ## 📄 License
 
@@ -298,4 +320,6 @@ MIT
 
 ---
 
-**Veritas** - Building the trust layer for the agentic economy.
+**Veritas** - Prove any activity. Store it forever. Query it always.
+
+*Verifiable Truth for the Agentic Economy*
