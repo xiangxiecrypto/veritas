@@ -71,11 +71,8 @@ contract VeritasValidationRegistry {
         string calldata requestURI,
         bytes32 requestHash
     ) external {
-        // Verify caller owns the agent
-        require(
-            _ownerOf(agentId) == msg.sender,
-            "Not agent owner"
-        );
+        // Ownership check moved to PrimusVeritasApp
+        // Any address can request validation (validator contracts, users, etc.)
         
         validations[requestHash] = ValidationInfo({
             validatorAddress: validatorAddress,

@@ -138,6 +138,12 @@ contract PrimusVeritasApp {
     ) external payable returns (bytes32 taskId) {
         VerificationRule storage rule = rules[ruleId];
         require(rule.active, "Rule inactive");
+        
+        // Verify caller owns the agent
+        require(
+            _isAgentOwner(agentId, msg.sender),
+            "Not agent owner"
+        );
 
         // Calculate fee
         FeeInfo memory feeInfo = primusTask.queryLatestFeeInfo(TokenSymbol.ETH);
@@ -311,5 +317,22 @@ contract PrimusVeritasApp {
 
     function getPendingValidation(bytes32 taskId) external view returns (PendingValidation memory) {
         return pendingValidations[taskId];
+    }
+    
+    function _isAgentOwner(uint256 agentId, address owner) internal view returns (bool) {
+        // Query identity registry to verify ownership
+        // Uses ERC-721 ownerOf standard
+        address identityRegistry = registry.getIdentityRegistry();
+        if (identityRegistry == address(0)) return false;
+        
+        (bool success, bytes memory result) = identityRegistry.staticcall(
+            abi.encodeWithSignature("ownerOf(uint256)", agentId)
+        );
+        
+        if (success && result.length >= 32) {
+            address agentOwner = abi.decode(result, (address));
+            return agentOwner == owner;
+        }
+        return false;
     }
 }
