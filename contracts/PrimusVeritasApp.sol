@@ -140,9 +140,7 @@ contract PrimusVeritasApp is IPrimusNetworkCallback {
         require(rule.active, "Rule inactive");
         
         // Verify caller owns the agent
-        // Note: This check queries the identity registry
-        // Temporarily disabled for testing - ownership verified off-chain
-        // require(_isAgentOwner(agentId, msg.sender), "Not agent owner");
+        require(_isAgentOwner(agentId, msg.sender), "Not agent owner");
 
         // Calculate fee
         FeeInfo memory feeInfo = primusTask.queryLatestFeeInfo(0); // 0 = ETH
@@ -152,7 +150,7 @@ contract PrimusVeritasApp is IPrimusNetworkCallback {
         // Submit task to Primus with THIS CONTRACT as callback
         taskId = primusTask.submitTask{value: totalFee}(
             msg.sender,
-            rule.url,
+            "", // templateId (empty string - actual URL is passed elsewhere)
             attestorCount,
             0, // 0 = ETH
             address(this)
