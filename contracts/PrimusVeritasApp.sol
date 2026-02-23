@@ -202,12 +202,13 @@ contract PrimusVeritasApp is IPrimusNetworkCallback {
         processedTasks[taskId] = true;
         
         // Process the validation with full attestation data
+        // SDK returns timestamp in milliseconds, convert to seconds
         _processValidation(
             taskId,
             result.attestation.request,
             result.attestation.responseResolve,
             result.attestation.data,
-            result.attestation.timestamp
+            result.attestation.timestamp / 1000
         );
     }
 
@@ -232,12 +233,13 @@ contract PrimusVeritasApp is IPrimusNetworkCallback {
         processedTasks[taskId] = true;
 
         // Process the validation with full attestation data
+        // SDK returns timestamp in milliseconds, convert to seconds
         _processValidation(
             taskId,
             taskResult.attestation.request,
             taskResult.attestation.responseResolve,
             taskResult.attestation.data,
-            taskResult.attestation.timestamp
+            taskResult.attestation.timestamp / 1000
         );
     }
 

@@ -32,7 +32,7 @@ module.exports = {
       chainId: 31337
     },
     baseSepolia: {
-      url: "https://sepolia.base.org",
+      url: process.env.BASE_SEPOLIA_RPC || "https://base-sepolia-rpc.publicnode.com",
       chainId: 84532,
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : []
     },
