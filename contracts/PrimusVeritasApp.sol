@@ -142,22 +142,9 @@ contract PrimusVeritasApp is IPrimusNetworkCallback {
         // Verify caller owns the agent
         require(_isAgentOwner(agentId, msg.sender), "Not agent owner");
 
-        // Calculate fee - use higher amount to cover 1M gas callback
-        // queryLatestFeeInfo returns base fee, but we need more for callback
+        // Calculate fee
         FeeInfo memory feeInfo = primusTask.queryLatestFeeInfo(0); // 0 = ETH
-        
-        // Calculate fee needed for 1M gas at current gas price
-        uint256 gasPrice = tx.gasprice;
-        uint256 callbackGasLimit = 1000000; // 1M gas
-        uint256 requiredForCallback = gasPrice * callbackGasLimit;
-        
-        // Use the higher of: Primus fee or callback requirement
-        uint256 totalFee = feeInfo.primusFee + feeInfo.attestorFee;
-        if (totalFee < requiredForCallback) {
-            totalFee = requiredForCallback;
-        }
-        
-        totalFee = totalFee * attestorCount;
+        uint256 totalFee = (feeInfo.primusFee + feeInfo.attestorFee) * attestorCount;
         require(msg.value >= totalFee, "Insufficient fee");
 
         // Submit task to Primus with THIS CONTRACT as callback
