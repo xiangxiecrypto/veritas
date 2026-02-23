@@ -197,14 +197,18 @@ contract PrimusVeritasApp is IPrimusNetworkCallback {
         
         // Get the attestation data
         TaskResult memory result = taskInfo.taskResults[0];
-        string memory attestationData = result.attestation.data;
-        uint64 timestamp = result.attestation.timestamp;
         
         // Mark as processed
         processedTasks[taskId] = true;
         
-        // Process the validation
-        _processValidation(taskId, attestationData, timestamp);
+        // Process the validation with full attestation data
+        _processValidation(
+            taskId,
+            result.attestation.request,
+            result.attestation.responseResolve,
+            result.attestation.data,
+            result.attestation.timestamp
+        );
     }
 
     /**
@@ -227,9 +231,11 @@ contract PrimusVeritasApp is IPrimusNetworkCallback {
         // Mark as processed
         processedTasks[taskId] = true;
 
-        // Process the validation
+        // Process the validation with full attestation data
         _processValidation(
             taskId,
+            taskResult.attestation.request,
+            taskResult.attestation.responseResolve,
             taskResult.attestation.data,
             taskResult.attestation.timestamp
         );
@@ -240,6 +246,8 @@ contract PrimusVeritasApp is IPrimusNetworkCallback {
      */
     function _processValidation(
         bytes32 taskId,
+        bytes memory request,
+        bytes memory responseResolve,
         string memory attestationData,
         uint64 timestamp
     ) internal {
@@ -278,8 +286,8 @@ contract PrimusVeritasApp is IPrimusNetworkCallback {
             maxScore += check.score;
 
             try ICustomCheck(check.checkContract).validate(
-                bytes(""),  // request (not used in current checks)
-                bytes(""),  // responseResolve (not used)
+                request,
+                responseResolve,
                 attestationData,
                 rule.url,
                 rule.dataKey,
