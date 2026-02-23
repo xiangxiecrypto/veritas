@@ -48,18 +48,6 @@ contract PrimusVeritasApp is IPrimusNetworkCallback {
     mapping(bytes32 => PendingValidation) public pendingValidations;
     mapping(bytes32 => bool) public processedTasks;
 
-    // Debug: Track all callback attempts
-    struct CallbackAttempt {
-        address caller;
-        bytes32 taskId;
-        address attestor;
-        string data;
-        uint256 blockTime;
-        bool success;
-    }
-    mapping(uint256 => CallbackAttempt) public callbackAttempts;
-    uint256 public callbackAttemptCount;
-
     event RuleAdded(uint256 indexed ruleId, string url);
     event CheckAdded(uint256 indexed ruleId, uint256 indexed checkId, int128 score);
     event ValidationRequested(bytes32 indexed taskId, uint256 indexed ruleId, uint256 indexed agentId);
@@ -196,19 +184,6 @@ contract PrimusVeritasApp is IPrimusNetworkCallback {
         TaskResult calldata taskResult,
         bool success
     ) external onlyTask {
-        // Log the callback attempt for debugging
-        uint256 attemptId = callbackAttemptCount++;
-        callbackAttempts[attemptId] = CallbackAttempt({
-            caller: msg.sender,
-            taskId: taskId,
-            attestor: taskResult.attestor,
-            data: taskResult.attestation.data,
-            blockTime: block.timestamp,
-            success: success
-        });
-
-        emit CallbackReceived(taskId, msg.sender, taskResult.attestor);
-
         // Don't process if failed or already processed
         if (!success) {
             return;
@@ -306,10 +281,6 @@ contract PrimusVeritasApp is IPrimusNetworkCallback {
             ids[i] = i;
         }
         return ids;
-    }
-
-    function getCallbackAttempt(uint256 attemptId) external view returns (CallbackAttempt memory) {
-        return callbackAttempts[attemptId];
     }
 
     function getPendingValidation(bytes32 taskId) external view returns (PendingValidation memory) {
