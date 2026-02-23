@@ -174,16 +174,10 @@ contract PrimusVeritasApp is IPrimusNetworkCallback {
 
     /**
      * @notice Manual submission of attestation result
-     * @dev Use this when auto-callback is not working (e.g., gas issues)
+     * @dev Fetches attestation data from Primus TaskContract (cannot be faked)
      * @param taskId The task identifier from requestValidation()
-     * @param attestationData The extracted data (e.g., '{"followers":"1121"}')
-     * @param timestamp Unix timestamp of attestation
      */
-    function submitAttestation(
-        bytes32 taskId,
-        string calldata attestationData,
-        uint64 timestamp
-    ) external {
+    function submitAttestation(bytes32 taskId) external {
         PendingValidation storage pending = pendingValidations[taskId];
         
         // Only requester or owner can submit
@@ -193,6 +187,18 @@ contract PrimusVeritasApp is IPrimusNetworkCallback {
         );
         
         require(!processedTasks[taskId], "Already processed");
+        
+        // Fetch attestation from Primus TaskContract (trusted source)
+        TaskInfo memory taskInfo = primusTask.queryTask(taskId);
+        
+        // Verify attestation exists
+        require(taskInfo.taskResults.length > 0, "No attestation found");
+        require(taskInfo.taskStatus == TaskStatus.SUCCESS, "Task not successful");
+        
+        // Get the attestation data
+        TaskResult memory result = taskInfo.taskResults[0];
+        string memory attestationData = result.attestation.data;
+        uint64 timestamp = result.attestation.timestamp;
         
         // Mark as processed
         processedTasks[taskId] = true;
