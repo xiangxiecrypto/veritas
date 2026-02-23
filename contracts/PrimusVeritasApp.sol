@@ -173,8 +173,37 @@ contract PrimusVeritasApp is IPrimusNetworkCallback {
     }
 
     /**
+     * @notice Manual submission of attestation result
+     * @dev Use this when auto-callback is not working (e.g., gas issues)
+     * @param taskId The task identifier from requestValidation()
+     * @param attestationData The extracted data (e.g., '{"followers":"1121"}')
+     * @param timestamp Unix timestamp of attestation
+     */
+    function submitAttestation(
+        bytes32 taskId,
+        string calldata attestationData,
+        uint64 timestamp
+    ) external {
+        PendingValidation storage pending = pendingValidations[taskId];
+        
+        // Only requester or owner can submit
+        require(
+            msg.sender == pending.requester || msg.sender == owner,
+            "Not authorized"
+        );
+        
+        require(!processedTasks[taskId], "Already processed");
+        
+        // Mark as processed
+        processedTasks[taskId] = true;
+        
+        // Process the validation
+        _processValidation(taskId, attestationData, timestamp);
+    }
+
+    /**
      * @notice Called by Primus Task contract when attestation is complete
-     * @dev This is the REAL callback from Primus - matches IPrimusNetworkCallback
+     * @dev This is the AUTO callback from Primus - matches IPrimusNetworkCallback
      * @param taskId The task identifier (returned from submitTask)
      * @param taskResult The full attestation result from Primus
      * @param success Whether the attestation succeeded
@@ -185,17 +214,29 @@ contract PrimusVeritasApp is IPrimusNetworkCallback {
         bool success
     ) external onlyTask {
         // Don't process if failed or already processed
-        if (!success) {
-            return;
-        }
-
-        if (processedTasks[taskId]) {
+        if (!success || processedTasks[taskId]) {
             return;
         }
 
         // Mark as processed
         processedTasks[taskId] = true;
 
+        // Process the validation
+        _processValidation(
+            taskId,
+            taskResult.attestation.data,
+            taskResult.attestation.timestamp
+        );
+    }
+
+    /**
+     * @dev Internal function to process validation - shared by both methods
+     */
+    function _processValidation(
+        bytes32 taskId,
+        string memory attestationData,
+        uint64 timestamp
+    ) internal {
         // Get pending validation details
         PendingValidation storage pending = pendingValidations[taskId];
         uint256 ruleId = pending.ruleId;
@@ -211,11 +252,9 @@ contract PrimusVeritasApp is IPrimusNetworkCallback {
         }
 
         // Verify freshness
-        if (block.timestamp - taskResult.attestation.timestamp > rule.maxAge) {
+        if (block.timestamp - timestamp > rule.maxAge) {
             return; // Expired
         }
-
-        // NOTE: URL/parsePath verification is now done in the custom check contract
 
         // Determine which checks to run
         uint256[] memory checkIds = pending.checkIds.length > 0
@@ -233,9 +272,9 @@ contract PrimusVeritasApp is IPrimusNetworkCallback {
             maxScore += check.score;
 
             try ICustomCheck(check.checkContract).validate(
-                taskResult.attestation.request,
-                taskResult.attestation.responseResolve,
-                taskResult.attestation.data,
+                bytes(""),  // request (not used in current checks)
+                bytes(""),  // responseResolve (not used)
+                attestationData,
                 rule.url,
                 rule.dataKey,
                 rule.parsePath,
@@ -258,13 +297,12 @@ contract PrimusVeritasApp is IPrimusNetworkCallback {
             : 0;
 
         // Store result in Registry (ERC-8004 compliant)
-        // responseURI points to attestation data, responseHash is its commitment
         try registry.validationResponse(
-            taskId,                                           // requestHash
-            response,                                         // response (0-100 score)
-            rule.url,                                         // responseURI (URL used for attestation)
-            keccak256(bytes(taskResult.attestation.data)),   // responseHash (commitment to data)
-            rule.description                                  // tag (description of validation)
+            taskId,
+            response,
+            rule.url,
+            keccak256(bytes(attestationData)),
+            rule.description
         ) {
             // Registry call succeeded
         } catch {
