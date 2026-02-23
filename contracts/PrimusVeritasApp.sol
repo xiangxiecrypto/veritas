@@ -10,10 +10,10 @@ import "./ICustomCheck.sol";
  * @notice Main application for Primus zkTLS validation with auto-callback
  * @dev Implements IPrimusNetworkCallback for automatic attestation processing
  */
-contract PrimusVeritasApp {
+contract PrimusVeritasApp is IPrimusNetworkCallback {
     address public owner;
     VeritasValidationRegistry public immutable registry;
-    IPrimusTask public immutable primusTask;
+    ITask public immutable primusTask;
 
     struct VerificationRule {
         string url;             // URL to fetch data from (e.g., "https://api.coinbase.com/v2/exchange-rates?currency=BTC")
@@ -81,7 +81,7 @@ contract PrimusVeritasApp {
     constructor(address _registry, address _primusTask) {
         owner = msg.sender;
         registry = VeritasValidationRegistry(_registry);
-        primusTask = IPrimusTask(_primusTask);
+        primusTask = ITask(_primusTask);
     }
 
     function transferOwnership(address newOwner) external onlyOwner {
@@ -145,7 +145,7 @@ contract PrimusVeritasApp {
         // require(_isAgentOwner(agentId, msg.sender), "Not agent owner");
 
         // Calculate fee
-        FeeInfo memory feeInfo = primusTask.queryLatestFeeInfo(TokenSymbol.ETH);
+        FeeInfo memory feeInfo = primusTask.queryLatestFeeInfo(0); // 0 = ETH
         uint256 totalFee = (feeInfo.primusFee + feeInfo.attestorFee) * attestorCount;
         require(msg.value >= totalFee, "Insufficient fee");
 
@@ -154,7 +154,7 @@ contract PrimusVeritasApp {
             msg.sender,
             rule.url,
             attestorCount,
-            TokenSymbol.ETH,
+            0, // 0 = ETH
             address(this)
         );
 

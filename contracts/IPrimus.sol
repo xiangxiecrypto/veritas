@@ -2,18 +2,14 @@
 pragma solidity ^0.8.0;
 
 // ============================================
-// SHARED PRIMUS INTERFACES
+// PRIMUS NETWORK INTERFACES
 // ============================================
-// These interfaces are shared between PrimusVeritasAppV5 and MockPrimusTask
-// to ensure function selectors match exactly.
-
-enum TokenSymbol {
-    ETH
-}
+// Matches the deployed Primus TaskContract on Base Sepolia
 
 struct FeeInfo {
     uint256 primusFee;
     uint256 attestorFee;
+    uint64 settedAt;
 }
 
 struct Attestation {
@@ -30,28 +26,36 @@ struct TaskResult {
     Attestation attestation;
 }
 
+enum TaskStatus {
+    INIT,
+    SUCCESS,
+    PARTIAL_SUCCESS,
+    PARTIAL_SUCCESS_SETTLED,
+    FAILED
+}
+
 struct TaskInfo {
     string templateId;
     address submitter;
     address[] attestors;
     TaskResult[] taskResults;
     uint64 submittedAt;
-    TokenSymbol tokenSymbol;
+    uint8 tokenSymbol;  // uint8 (0 = ETH)
     address callback;
-    uint8 taskStatus;
+    TaskStatus taskStatus;
 }
 
-interface IPrimusTask {
+interface ITask {
     function submitTask(
         address sender,
         string calldata templateId,
         uint256 attestorCount,
-        TokenSymbol tokenSymbol,
+        uint8 tokenSymbol,  // uint8 (0 = ETH) - matches deployed contract
         address callback
     ) external payable returns (bytes32 taskId);
 
-    function queryLatestFeeInfo(TokenSymbol tokenSymbol) external view returns (FeeInfo memory);
-    function queryTask(bytes32 taskId) external view returns (TaskInfo memory);
+    function queryTask(bytes32 taskId) external view returns (TaskInfo memory taskInfo);
+    function queryLatestFeeInfo(uint8 tokenSymbol) external view returns (FeeInfo memory feeInfo);
 }
 
 interface IPrimusNetworkCallback {

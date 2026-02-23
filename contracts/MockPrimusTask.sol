@@ -6,20 +6,20 @@ import "./IPrimus.sol";
 /**
  * @title MockPrimusTask
  * @notice A mock PrimusTask for testing the callback flow
- * @dev Simulates the Primus attestation process with correct interface
+ * @dev Simulates the Primus attestation process with official interface
  */
 contract MockPrimusTask {
     address public owner;
-    uint256 public primusFee = 0.001 ether;  // 0.001 ETH
-    uint256 public attestorFee = 0.0001 ether; // 0.0001 ETH per check
+    uint256 public primusFee = 10000000000; // 10^10 wei
+    uint256 public attestorFee = 0;
     
     struct Task {
         address requester;
         string templateId;
         uint256 attestorCount;
-        TokenSymbol tokenSymbol;
+        uint8 tokenSymbol;  // 0 = ETH
         address callback;
-        uint8 status; // 0=pending, 1=completed, 2=failed
+        TaskStatus status;
         TaskResult result;
     }
     
@@ -38,21 +38,11 @@ contract MockPrimusTask {
         owner = msg.sender;
     }
     
-    function setFee(uint256 _primusFee, uint256 _attestorFee) external onlyOwner {
-        primusFee = _primusFee;
-        attestorFee = _attestorFee;
-    }
-    
-    // Legacy queryFee function
-    function queryFee() external view returns (uint256, uint256) {
-        return (primusFee, attestorFee);
-    }
-    
-    // New queryLatestFeeInfo function matching Primus interface
-    function queryLatestFeeInfo(TokenSymbol tokenSymbol) external view returns (FeeInfo memory) {
+    function queryLatestFeeInfo(uint8) external pure returns (FeeInfo memory) {
         return FeeInfo({
-            primusFee: primusFee,
-            attestorFee: attestorFee
+            primusFee: 10000000000,
+            attestorFee: 0,
+            settedAt: 0
         });
     }
     
@@ -60,28 +50,24 @@ contract MockPrimusTask {
         address sender,
         string calldata templateId,
         uint256 attestorCount,
-        TokenSymbol tokenSymbol,
+        uint8 tokenSymbol,
         address callback
     ) external payable returns (bytes32 taskId) {
-        // Calculate required fee
-        uint256 requiredFee = primusFee + (attestorFee * attestorCount);
-        require(msg.value >= requiredFee, "Insufficient fee");
+        require(msg.value >= primusFee, "Insufficient fee");
         
-        // Generate task ID
         taskId = keccak256(abi.encodePacked(
             block.timestamp,
             taskCounter++,
             sender
         ));
         
-        // Store task
         tasks[taskId] = Task({
             requester: sender,
             templateId: templateId,
             attestorCount: attestorCount,
             tokenSymbol: tokenSymbol,
             callback: callback,
-            status: 0, // pending
+            status: TaskStatus.INIT,
             result: TaskResult({
                 attestor: address(0),
                 taskId: bytes32(0),
@@ -98,31 +84,24 @@ contract MockPrimusTask {
         emit TaskSubmitted(taskId, sender, templateId);
     }
     
-    function queryTask(bytes32 taskId) external view returns (
-        address requester,
-        string memory templateId,
-        uint256 attestorCount,
-        TokenSymbol tokenSymbol,
-        address callback,
-        uint8 taskStatus,
-        TaskResult memory taskResult
-    ) {
+    function queryTask(bytes32 taskId) external view returns (TaskInfo memory taskInfo) {
         Task storage task = tasks[taskId];
-        return (
-            task.requester,
-            task.templateId,
-            task.attestorCount,
-            task.tokenSymbol,
-            task.callback,
-            task.status,
-            task.result
-        );
+        
+        TaskResult[] memory results = new TaskResult[](1);
+        results[0] = task.result;
+        
+        return TaskInfo({
+            templateId: task.templateId,
+            submitter: task.requester,
+            attestors: new address[](0),
+            taskResults: results,
+            submittedAt: 0,
+            tokenSymbol: task.tokenSymbol,
+            callback: task.callback,
+            taskStatus: task.status
+        });
     }
     
-    /**
-     * @notice Complete a task with attestation result (called by owner for testing)
-     * @dev This simulates Primus calling the callback
-     */
     function completeTask(
         bytes32 taskId,
         address recipient,
@@ -131,20 +110,22 @@ contract MockPrimusTask {
         uint64 timestamp
     ) external onlyOwner {
         Task storage task = tasks[taskId];
-        require(task.status == 0, "Task not pending or already processed");
+        require(task.status == TaskStatus.INIT, "Task not pending");
         require(task.callback != address(0), "No callback");
         
-        // Set up attestation result
-        task.result.attestation = Attestation({
-            recipient: recipient,
-            request: bytes(requestUrl),
-            responseResolve: "",
-            data: attestationData,
-            timestamp: timestamp
+        task.result = TaskResult({
+            attestor: msg.sender,
+            taskId: taskId,
+            attestation: Attestation({
+                recipient: recipient,
+                request: bytes(requestUrl),
+                responseResolve: "",
+                data: attestationData,
+                timestamp: timestamp
+            })
         });
-        task.status = 1; // completed
+        task.status = TaskStatus.SUCCESS;
         
-        // Call the callback
         IPrimusNetworkCallback(task.callback).reportTaskResultCallback(
             taskId,
             task.result,
@@ -154,35 +135,6 @@ contract MockPrimusTask {
         emit TaskCompleted(taskId, true);
     }
     
-    /**
-     * @notice Complete a task with real Primus SDK attestation
-     * @dev This takes the attestation from Primus SDK and forwards it
-     */
-    function completeTaskWithAttestation(
-        bytes32 taskId,
-        TaskResult calldata taskResult,
-        bool success
-    ) external onlyOwner {
-        Task storage task = tasks[taskId];
-        require(task.status == 0, "Task not pending or already processed");
-        require(task.callback != address(0), "No callback");
-        
-        task.result = taskResult;
-        task.status = success ? 1 : 2;
-        
-        // Call the callback
-        IPrimusNetworkCallback(task.callback).reportTaskResultCallback(
-            taskId,
-            taskResult,
-            success
-        );
-        
-        emit TaskCompleted(taskId, success);
-    }
-    
-    /**
-     * @notice Withdraw fees
-     */
     function withdraw() external onlyOwner {
         payable(owner).transfer(address(this).balance);
     }
