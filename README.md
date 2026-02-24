@@ -1,475 +1,244 @@
 # Veritas Protocol
 
-> **Verifiable Truth for the Agentic Economy**
+**Build verifiable trust for AI agents with ERC-8004 and Primus zkTLS.**
 
-Veritas Protocol enables AI agents to **cryptographically prove their activities**—trades, computations, data fetches, service deliveries—creating an immutable record of verifiable work on-chain.
+Veritas combines ERC-8004 agent identity with Primus zkTLS attestations to create cryptographically verifiable reputation for AI agents.
 
-## 🚀 The Problem
+## Quick Start
 
-AI agents are becoming autonomous economic actors:
-- Trading billions in DeFi
-- Running complex computations  
-- Fetching critical data for smart contracts
-- Providing services to users
-
-**But how do you verify an AI actually did what it claims?**
-
-Traditional approaches fail:
-- ❌ Self-reported logs (easily faked)
-- ❌ Centralized audits (expensive, slow)
-- ❌ Social proofs (unreliable)
-
-## 💡 The Solution
-
-Veritas provides **cryptographic proof of agent activities** through a seamless, **fully customizable** three-layer stack:
-
-> **"If you can fetch it from an API, you can prove it on-chain."**
-
-Define your own rules. Create your own checks. Prove any activity.
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        VERITAS PROTOCOL                              │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                       │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐      │
-│  │   Activity      │  │   Validation    │  │   Verification  │      │
-│  │   Recording     │  │   (Primus)      │  │   (On-Chain)    │      │
-│  │                 │  │                 │  │                 │      │
-│  │ • Agent Registry│  │ • zkTLS Proofs  │  │ • Proof Storage │      │
-│  │ • Metadata      │  │ • API Attests   │  │ • Score Calc    │      │
-│  │ • Ownership     │  │ • Auto-Callback │  │ • Queryable     │      │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘      │
-│          │                   │                   │                   │
-│          ▼                   ▼                   ▼                   │
-│  ┌─────────────────────────────────────────────────────────────┐    │
-│  │              "Prove any agent activity,                      │    │
-│  │               store it on-chain,                             │    │
-│  │               query it forever"                              │    │
-│  └─────────────────────────────────────────────────────────────┘    │
-│                                                                       │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-## ✨ What You Can Prove
-
-**Literally anything an AI agent does.** If it can be fetched from an API, Veritas can prove it.
-
-### 📊 Trading Activity
-```solidity
-// Prove an AI agent executed a trade on Coinbase
-app.addRule(
-    "https://api.exchange.coinbase.com/orders/{orderId}",
-    "filled_size",
-    "$.filled_size",
-    8,      // decimals
-    300,    // max age 5 min
-    "Trade Execution Proof"
-);
-
-// Result: Cryptographic proof that order was filled
-// Stored on-chain, verifiable forever
-```
-
-### 🔮 Oracle Data
-```solidity
-// Prove price data came from Binance at specific time
-app.addRule(
-    "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT",
-    "price", 
-    "$.price",
-    2,
-    60,     // 1 minute freshness
-    "Binance BTC Price"
-);
-
-// Result: zkTLS proof of price at timestamp
-// DeFi protocols can verify before using
-```
-
-### 🖥️ Computation Results
-```solidity
-// Prove ML inference was run on specific data
-app.addRule(
-    "https://ml-service.com/inference/{jobId}",
-    "prediction",
-    "$.result.prediction",
-    6,
-    600,
-    "ML Inference Result"
-);
-
-// Result: Proof that model produced specific output
-// Audit trail for AI decisions
-```
-
-### 🛠️ Service Delivery
-```solidity
-// Prove API service responded correctly
-app.addRule(
-    "https://api.service.com/health",
-    "status",
-    "$.status",
-    0,
-    30,
-    "Service Health Check"
-);
-
-// Result: Uptime proof for SLA enforcement
-```
-
-## 🏗️ Architecture
-
-### Layer 1: Activity Recording (ERC-8004)
-
-Agents register as on-chain entities with standardized metadata:
-
-```solidity
-// Register your agent
-uint256 agentId = identityRegistry.register(agentURI);
-
-// Store capabilities, endpoints, services
-{
-  "name": "AlphaTrader",
-  "services": ["market-analysis", "auto-trading"],
-  "endpoint": "https://api.alphatrader.com"
-}
-```
-
-### Layer 2: Validation (Primus zkTLS)
-
-Cryptographic proof generation for any API call:
-
-```javascript
-// Request proof of activity
-const taskId = await app.requestValidation({
-    agentId: agentId,
-    ruleId: 0,              // Which activity to prove
-    attestorCount: 1        // How many attestors
-});
-
-// Primus network:
-// 1. Calls the API (e.g., Coinbase)
-// 2. Generates zkTLS proof
-// 3. Returns attestation data
-```
-
-### Layer 3: Verification (On-Chain)
-
-Smart contracts verify proofs and store results:
-
-```solidity
-// Automatic callback when proof is ready
-function reportTaskResultCallback(...) {
-    // 1. Verify attestation data
-    // 2. Extract value using parsePath
-    // 3. Run custom checks
-    // 4. Calculate score
-    // 5. Store permanently
-}
-```
-
-## 🔥 Why Veritas?
-
-| Traditional | Veritas |
-|-------------|---------|
-| "Trust me bro" | Cryptographic proof |
-| Expensive audits | Automated validation |
-| Opaque black box | Transparent, verifiable |
-| Centralized trust | Decentralized verification |
-| Easy to fake | Impossible to forge |
-
-## 🎯 Use Cases
-
-### For DeFi Protocols
-**Prove liquidity operations**
-```javascript
-// Before accepting a deposit, verify the agent
-// actually deposited funds to the pool
-const proof = await verifyActivity(agentId, "deposit");
-if (proof.score >= 95) {
-    acceptDeposit(agentId, amount);
-}
-```
-
-### For AI Marketplaces
-**Prove service quality**
-```javascript
-// Customers verify agent completed task
-// before releasing payment
-const completed = await verifyActivity(agentId, taskId);
-if (completed) {
-    releasePayment(agentId, reward);
-}
-```
-
-### For Data Providers
-**Prove data freshness**
-```javascript
-// Smart contracts verify price data
-// came from Binance < 1 minute ago
-const { score, timestamp } = await verifyActivity(
-    agentId, 
-    "binance-price"
-);
-if (score >= 90 && timestamp > now - 60) {
-    usePrice(data);
-}
-```
-
-### For Compliance
-**Immutable audit trail**
-```javascript
-// Every action by regulated AI agents
-// is permanently recorded on-chain
-const history = await getActivityHistory(agentId);
-// Perfect for regulatory compliance
-```
-
-## 📦 Quick Start
+### Install Dependencies
 
 ```bash
-# Install dependencies
 npm install
-
-# Deploy contracts
-npx hardhat run scripts/deploy-and-test.js --network baseSepolia
 ```
 
-## 💻 Example: Prove a Trade
+### Run Tests
+
+```bash
+# BTC price validation (public API - no auth needed)
+npx hardhat run test/test-btc-sdk.js --network baseSepolia
+
+# Moltbook karma validation (requires API key)
+export MOLTBOOK_API_KEY=your_api_key
+npx hardhat run test/test-moltbook-sdk.js --network baseSepolia
+
+# Identity registration
+npx hardhat run test/test-identity-registration.js --network baseSepolia
+```
+
+## SDK Usage
+
+### Initialize
 
 ```javascript
-import { VeritasSDK } from './src/sdk';
+const { VeritasSDK } = require('./sdk');
 
-const sdk = new VeritasSDK({ signer, network: 'sepolia' });
-
-// 1. Register your trading agent
-const agentId = await sdk.registerAgent({
-  name: "HighFreqTrader",
-  services: [{ name: "Arbitrage", endpoint: "..." }]
-});
-
-// 2. Define what to prove
-await sdk.addRule({
-  templateId: "https://api.exchange.com/trades/{tradeId}",
-  dataKey: "filledAmount",
-  parsePath: "$.filled_amount",  // Security: exact field
-  decimals: 8,
-  maxAge: 60,
-  description: "Trade Execution"
-});
-
-// 3. Request proof
-const taskId = await sdk.requestValidation(agentId, 0);
-
-// 4. Wait for proof
-const result = await sdk.waitForAttestation(taskId);
-console.log(`Trade proven! Score: ${result.score}/100`);
-
-// 5. Anyone can verify
-const proof = await sdk.getActivityProof(agentId, taskId);
-// { score: 95, timestamp: 1699123456, data: "..." }
+const sdk = new VeritasSDK();
+await sdk.init(signer);
 ```
 
-## 🔧 Fully Customizable Rules & Checks
+### Register Agent
 
-Veritas is designed for **maximum flexibility**. Define any activity you want to prove with custom rules and validation logic.
-
-### Define Any Rule
-
-```solidity
-// Prove Twitter follower count
-app.addRule(
-    "https://api.twitter.com/2/users/{userId}/followers",  // url
-    "follower_count",                                       // dataKey
-    "$.data.public_metrics.followers_count",               // parsePath
-    0,      // No decimals
-    3600,   // 1 hour freshness
-    "Twitter Followers"
-);
-
-// Prove GitHub commit
-app.addRule(
-    "https://api.github.com/repos/{owner}/{repo}/commits/{sha}",
-    "commit_author",
-    "$.commit.author.name",
-    0,
-    86400,  // 1 day
-    "GitHub Commit"
-);
-
-// Prove weather data
-app.addRule(
-    "https://api.weather.com/v1/current?city={city}",
-    "temperature",
-    "$.current.temp_c",
-    1,
-    600,    // 10 minutes
-    "Temperature Proof"
-);
-
-// Prove any API response...
-```
-
-**Any URL. Any JSON path. Any validation logic.**
-
-### Create Any Check
-
-```solidity
-// Check 1: Price must be in range
-contract PriceRangeCheck is ICustomCheck {
-    function validate(string memory dataKey, string memory data, bytes memory params) 
-        external override returns (bool passed, int128 value) 
-    {
-        (int128 min, int128 max) = abi.decode(params, (int128, int128));
-        value = extractValue(data, dataKey);
-        passed = (value >= min && value <= max);
-    }
-}
-
-// Check 2: String must match pattern
-contract RegexCheck is ICustomCheck {
-    function validate(string memory dataKey, string memory data, bytes memory params)
-        external override returns (bool passed, int128 value)
-    {
-        string memory pattern = abi.decode(params, (string));
-        string memory extracted = extractString(data, dataKey);
-        passed = matchRegex(extracted, pattern);
-        value = passed ? 1 : 0;
-    }
-}
-
-// Check 3: Timestamp must be recent
-contract FreshnessCheck is ICustomCheck {
-    function validate(string memory dataKey, string memory data, bytes memory params)
-        external override returns (bool passed, int128 value)
-    {
-        uint256 maxAge = abi.decode(params, (uint256));
-        uint256 timestamp = extractTimestamp(data, dataKey);
-        passed = (block.timestamp - timestamp <= maxAge);
-        value = int128(uint128(block.timestamp - timestamp));
-    }
-}
-
-// Check 4: List must contain item
-contract ContainsCheck is ICustomCheck {
-    function validate(string memory dataKey, string memory data, bytes memory params)
-        external override returns (bool passed, int128 value)
-    {
-        string memory target = abi.decode(params, (string));
-        string[] memory items = extractArray(data, dataKey);
-        passed = contains(items, target);
-        value = passed ? 1 : 0;
-    }
-}
-
-// ...add any check you need
-```
-
-**Composable, reusable, extensible.**
-
-### Combine Multiple Checks
-
-```solidity
-// Prove BTC price with multiple validations
-await app.addCheck(ruleId, priceRangeCheck.address, 
-    encode(6000000, 10000000),  // $60k-$100k
-    60  // 60% weight
-);
-
-await app.addCheck(ruleId, freshnessCheck.address,
-    encode(300),  // < 5 minutes old
-    40  // 40% weight
-);
-
-// Final score = weighted average of all checks
-```
-
-### Real-World Example: DeFi Agent
-
-```solidity
-// Prove a complex trading activity
-app.addRule(
-    "https://api.1inch.io/v5.0/1/swap",
-    "swap_result",
-    "$.tx.data",
-    18,
-    300,
-    "1inch Swap Execution"
-);
-
-// Checks:
-// 1. Slippage < 1%
-// 2. Gas price < 50 gwei
-// 3. Execution time < 30s
-// 4. Token received > expected minimum
-
-await app.addCheck(ruleId, slippageCheck, encode(100), 40);    // 40%
-await app.addCheck(ruleId, gasPriceCheck, encode(50e9), 30);   // 30%
-await app.addCheck(ruleId, timeCheck, encode(30), 20);         // 20%
-await app.addCheck(ruleId, minOutCheck, encode(minAmount), 10);// 10%
-```
-
-**Any activity. Any validation. Any complexity.**
-
-## 🔐 Security Features
-
-### Parse Path Validation
-```solidity
-// Rules specify exact JSON path
-parsePath: "$.data.rates.USD"  // Must extract this field
-```
-Prevents agents from manipulating which data is validated.
-
-### Direct TaskContract Calls
 ```javascript
-// Bypass SDK bug by calling contract directly
-await taskContract.submitTask(
-  sender, templateId, attestorCount, token, callback, {value: fee}
+// Auto-assigns agent ID
+const result = await sdk.registerAgent();
+console.log('Agent ID:', result.agentId);
+
+// With metadata URI
+const result = await sdk.registerAgent('https://example.com/agent.json');
+```
+
+### Validate (Generic)
+
+The SDK uses Primus-style `request` and `responseResolves` for maximum flexibility:
+
+```javascript
+// Create request (Primus format)
+const request = VeritasSDK.createRequest(
+  'https://api.example.com/data',
+  { header: { 'Authorization': 'Bearer token' } }
 );
+
+// Create response resolve (Primus format)
+const responseResolves = VeritasSDK.createResponseResolve(
+  'value',           // keyName
+  '$.data.value',    // parsePath (JSONPath)
+  'json'             // parseType (optional, default: 'json')
+);
+
+// Validate
+const result = await sdk.validate({
+  agentId: result.agentId,
+  ruleId: 0,
+  checkIds: [0],
+  request,
+  responseResolves
+});
+
+console.log('Score:', result.score);
+console.log('Passed:', result.passed);
 ```
-Ensures callback is set correctly for auto-verification.
 
-### Custom Checks (Pluggable)
-```solidity
-// Use built-in checks or create your own
-PriceRangeCheck    // Numeric range validation
-ThresholdCheck     // Min/max thresholds
-RegexCheck         // Pattern matching
-FreshnessCheck     // Timestamp validation
-ContainsCheck      // Array membership
-// ...or implement ICustomCheck
+### Full Example: Moltbook Karma Validation
+
+```javascript
+const { VeritasSDK } = require('./sdk');
+const hre = require("hardhat");
+
+async function main() {
+  const [signer] = await hre.ethers.getSigners();
+  
+  // Initialize SDK
+  const sdk = new VeritasSDK();
+  await sdk.init(signer);
+  
+  // Register agent
+  const { agentId } = await sdk.registerAgent();
+  console.log('Agent ID:', agentId);
+  
+  // Build request with authentication
+  const request = VeritasSDK.createRequest(
+    'https://www.moltbook.com/api/v1/agents/me',
+    { 
+      header: { 
+        'Authorization': `Bearer ${process.env.MOLTBOOK_API_KEY}` 
+      } 
+    }
+  );
+  
+  // Define what to extract
+  const responseResolves = VeritasSDK.createResponseResolve(
+    'karma',           // keyName
+    '$.agent.karma'    // JSONPath
+  );
+  
+  // Run validation
+  const result = await sdk.validate({
+    agentId,
+    ruleId: 1,         // Moltbook karma rule
+    checkIds: [0],
+    request,
+    responseResolves
+  });
+  
+  console.log('Success:', result.success);
+  console.log('Score:', result.score);
+  console.log('Tx:', result.callbackTxHash);
+}
+
+main();
 ```
 
-## 📚 Documentation
+## Architecture
 
-- [Protocol Design](./docs/PROTOCOL_DESIGN.md) - Deep dive into architecture
-- [Workflow](./docs/WORKFLOW.md) - Step-by-step guides
-- [Custom Checks](./docs/CUSTOM_CHECK_DESIGN.md) - Create validation logic
+```
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│   VeritasSDK    │────▶│ PrimusVeritasApp │────▶│ ReputationRegistry │
+│  (TypeScript)   │     │   (Solidity)     │     │    (ERC-8004)      │
+└─────────────────┘     └──────────────────┘     └─────────────────┘
+        │                        │                        │
+        ▼                        ▼                        ▼
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│  Primus SDK     │     │  Custom Checks   │     │ ValidationRegistry│
+│   (zkTLS)       │     │  (Solidity)      │     │    (Storage)      │
+└─────────────────┘     └──────────────────┘     └─────────────────┘
+```
 
-## 🌐 Deployed Contracts (Base Sepolia)
+### Flow
+
+1. **Register Agent** - Get unique on-chain identity (ERC-8004)
+2. **Request Validation** - Submit validation request to PrimusVeritasApp
+3. **Primus Attestation** - zkTLS proof generated off-chain
+4. **Auto-Callback** - Verification results posted on-chain
+5. **Reputation Update** - Score added to agent's reputation
+
+## Deployed Contracts (Base Sepolia)
 
 | Contract | Address |
 |----------|---------|
-| Primus Task | `0xC02234058caEaA9416506eABf6Ef3122fCA939E8` |
-| VeritasValidationRegistry | `0x257DC4B38066840769EeA370204AD3724ddb0836` |
+| PrimusVeritasApp | `0xC34E7059e1E891a4c42F9232D0162dCab92Fa0ec` |
+| SimpleVerificationCheck | `0xb8F13205a0f7754A5EFeb11a6B159F0d8C70ef55` |
+| MoltbookKarmaCheck | `0x7BDFd547dc461932f9feeD0b52231E76bbFc52C8` |
+| IdentityRegistry | `0x8004A818BFB912233c491871b3d84c89A494BD9e` |
+| ValidationRegistry | `0xAeFdE0707014b6540128d3835126b53F073fEd40` |
+| ReputationRegistry | `0x8004B663056A597Dffe9eCcC1965A193B7388713` |
 
-## 🛣️ Roadmap
+## Custom Checks
 
-- [x] Core proof generation
-- [x] Auto-callback mechanism
-- [x] Custom validation checks
-- [x] Parse path security
-- [ ] Mainnet deployment
-- [ ] Multi-chain proofs
-- [ ] Governance integration
+Create custom validation checks by implementing `ICustomCheck`:
 
-## 📄 License
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+interface ICustomCheck {
+    function validate(
+        bytes calldata request,
+        bytes calldata responseResolve,
+        bytes calldata attestationData,
+        string calldata url,
+        string calldata dataKey,
+        string calldata parsePath,
+        bytes calldata params
+    ) external returns (bool);
+}
+```
+
+Example: [MoltbookKarmaCheck.sol](./contracts/checks/MoltbookKarmaCheck.sol)
+
+## Project Structure
+
+```
+├── sdk/
+│   ├── VeritasSDK.js      # Main SDK class
+│   └── index.js           # Exports
+├── contracts/
+│   ├── PrimusVeritasApp.sol
+│   ├── ICustomCheck.sol
+│   └── checks/
+│       ├── SimpleVerificationCheck.sol
+│       └── MoltbookKarmaCheck.sol
+├── test/
+│   ├── test-btc-sdk.js
+│   ├── test-moltbook-sdk.js
+│   └── test-identity-registration.js
+├── scripts/
+│   ├── deploy.js
+│   └── setup-rules.js
+└── docs/
+    └── *.md
+```
+
+## Configuration
+
+### Environment Variables
+
+```bash
+# For Moltbook protected endpoint tests
+export MOLTBOOK_API_KEY=your_api_key
+```
+
+### Hardhat Config
+
+Update `hardhat.config.js` with your network settings:
+
+```javascript
+module.exports = {
+  networks: {
+    baseSepolia: {
+      url: "https://sepolia.base.org",
+      accounts: [process.env.PRIVATE_KEY]
+    }
+  }
+};
+```
+
+## Links
+
+- [Primus Network](https://primuslab.org/)
+- [ERC-8004 Specification](https://eips.ethereum.org/EIPS/eip-8004)
+- [Base Sepolia Explorer](https://sepolia.basescan.org/)
+
+## License
 
 MIT
-
----
-
-**Veritas** - Prove any activity. Store it forever. Query it always.
-
-*Verifiable Truth for the Agentic Economy*

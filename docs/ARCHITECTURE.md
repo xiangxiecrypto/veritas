@@ -2,89 +2,106 @@
 
 ## Overview
 
-Veritas Protocol enables AI agents to build verifiable reputation using Primus zkTLS attestations.
+Veritas Protocol provides on-chain verification of API attestations using Primus zkTLS. The system consists of three main components:
 
-## Core Components
+1. **VeritasSDK** - TypeScript SDK for easy integration
+2. **PrimusVeritasApp** - Smart contract that coordinates validation
+3. **Custom Checks** - Pluggable validation logic
+
+## Components
+
+### 1. VeritasSDK (TypeScript)
+
+The SDK wraps Primus SDK with higher-level abstractions:
+
+```javascript
+const sdk = new VeritasSDK();
+await sdk.init(signer);
+
+// Agent management
+await sdk.registerAgent();
+await sdk.getAgentInfo(agentId);
+
+// Validation
+await sdk.validate({ agentId, ruleId, checkIds, request, responseResolves });
+```
+
+### 2. PrimusVeritasApp (Solidity)
+
+Main contract that handles:
+- Rule management (API endpoints to validate)
+- Check management (validation logic contracts)
+- Attestation verification
+- Auto-callback to ReputationRegistry
+
+### 3. Custom Checks (Solidity)
+
+Implement `ICustomCheck` interface:
+
+```solidity
+function validate(
+    bytes calldata request,
+    bytes calldata responseResolve,
+    bytes calldata attestationData,
+    string calldata url,
+    string calldata dataKey,
+    string calldata parsePath,
+    bytes calldata params
+) external returns (bool);
+```
+
+## Validation Flow
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        VERITAS PROTOCOL                              │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│  ┌──────────────────┐     ┌───────────────────┐                     │
-│  │  PrimusVeritasApp │     │  TaskContract      │                     │
-│  │                  │────→│  (Primus)          │                     │
-│  │ • requestValidation()   │  • submitTask()    │                     │
-│  │ • reportTaskResultCallback()              │                     │
-│  │ • rules[]         │     │  • attest()        │                     │
-│  └────────┬─────────┘     └─────────┬──────────┘                     │
-│           │                         │                                │
-│           │              ┌──────────┴──────────┐                     │
-│           │              │   SDK.attest()      │                     │
-│           │              │   (Off-chain zkTLS) │                     │
-│           │              └──────────┬──────────┘                     │
-│           │                         │                                │
-│           ↓                         ↓                                │
-│  ┌──────────────────┐     ┌───────────────────┐                     │
-│  │VeritasValidation │     │  Custom Checks    │                     │
-│  │    Registry      │     │  • PriceRangeCheck│                     │
-│  │                  │     │  • ThresholdCheck │                     │
-│  │ • validationResponse()                   │                     │
-│  │ • scores[]       │     └───────────────────┘                     │
-│  └──────────────────┘                                               │
-└─────────────────────────────────────────────────────────────────────┘
-
-## Key Contracts
-
-### PrimusVeritasApp.sol
-Main application contract that:
-- Implements `IPrimusNetworkCallback` for auto-callback
-- Manages verification rules
-- Runs custom checks on attestation data
-- Submits results to VeritasValidationRegistry
-
-### VeritasValidationRegistry.sol
-Stores validation results:
-- Maps taskId → validation info
-- Records scores (0-100)
-- Tracks validator and agent IDs
-
-### Custom Checks (checks/ folder)
-- **PriceRangeCheck**: Validates numeric values within ranges
-- **ThresholdCheck**: Validates against thresholds
-
-## Flow
-
-1. **Deploy**: Deploy PrimusVeritasApp with Registry and Primus Task addresses
-2. **Add Rules**: Define verification rules (URL, data key, checks)
-3. **Submit Task**: Call TaskContract.submitTask() directly with callback = PrimusVeritasApp
-4. **Attest**: Use Primus SDK to generate zkTLS proof
-5. **Auto-Callback**: Primus calls reportTaskResultCallback() automatically
-6. **Validate**: Contract runs checks and calculates score
-7. **Store**: Results saved to VeritasValidationRegistry
+┌──────────────┐
+│ 1. Register  │ Agent gets ERC-8004 identity
+│    Agent     │
+└──────┬───────┘
+       │
+       ▼
+┌──────────────┐
+│ 2. Request   │ Call validate() with Primus-style params
+│  Validation  │
+└──────┬───────┘
+       │
+       ▼
+┌──────────────┐
+│ 3. Primus    │ Off-chain zkTLS attestation
+│  Attestation │
+└──────┬───────┘
+       │
+       ▼
+┌──────────────┐
+│ 4. Auto      │ On-chain verification + reputation update
+│  Callback    │
+└──────┬───────┘
+       │
+       ▼
+┌──────────────┐
+│ 5. Complete  │ Agent reputation score updated
+└──────────────┘
+```
 
 ## Contract Addresses (Base Sepolia)
 
-| Contract | Address |
+| Contract | Purpose |
 |----------|---------|
-| Primus Task | `0xC02234058caEaA9416506eABf6Ef3122fCA939E8` |
-| VeritasValidationRegistry | `0x257DC4B38066840769EeA370204AD3724ddb0836` |
+| PrimusVeritasApp | Main validation contract |
+| IdentityRegistry | ERC-8004 agent identity |
+| ValidationRegistry | Validation history storage |
+| ReputationRegistry | Agent reputation scores |
+| SimpleVerificationCheck | Generic URL/dataKey validation |
+| MoltbookKarmaCheck | Moltbook karma validation |
 
-## Implementation Notes
+## Gas Optimization
 
-### Direct TaskContract Calls
-The Primus SDK's `PrimusNetwork.submitTask()` has a bug where `callbackAddress` is ignored. Solution: Call `TaskContract.submitTask()` directly using ethers.js:
+- Custom checks use `{gas: 100000}` for interface calls
+- Struct packing for efficient storage
+- Events for off-chain indexing
 
-```javascript
-const taskContract = new ethers.Contract(PRIMUS_TASK, TASK_ABI, wallet);
-await taskContract.submitTask(
-  wallet.address,  // sender
-  "",              // templateId
-  1,               // attestorCount
-  0,               // tokenSymbol (ETH)
-  app.address,     // callback ← Set correctly!
-  { value: fee }
-);
-```
+## Security Considerations
 
-This bypasses the SDK bug and enables auto-callback functionality.
+1. **Attestation Verification** - All attestations verified via Primus TaskContract
+2. **Timestamp Validation** - Prevents replay attacks with maxAge
+3. **Owner Verification** - Only agent owner can request validation
+4. **Check Isolation** - Each check is an isolated contract
