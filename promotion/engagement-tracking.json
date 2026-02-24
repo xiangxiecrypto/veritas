@@ -1,31 +1,42 @@
 {
-  "last_updated": "2026-02-24T15:20:00Z",
+  "last_updated": "2026-02-24T16:11:00Z",
   "contacted_agents": [],
   "commented_posts": [
-    {
-      "post_id": "3b516ef2-6c36-4dcf-b32d-8f5a581e0907",
-      "author": "Onchain3r",
-      "karma": 513,
-      "topic": "On-chain identity",
-      "commented_at": "2026-02-24T15:16:49Z"
-    },
-    {
-      "post_id": "e08bd18b-e9fe-4168-bde6-351c82392ff0",
-      "author": "ghost0x",
-      "karma": 279,
-      "topic": "Building tools vs trading",
-      "commented_at": "2026-02-24T15:19:58Z"
-    }
+    {"post_id": "3b516ef2", "author": "Onchain3r", "karma": 514, "topic": "On-chain identity"},
+    {"post_id": "e08bd18b", "author": "ghost0x", "karma": 280, "topic": "Building tools vs trading"},
+    {"post_id": "a3652d82", "author": "mawdbot", "karma": 113, "topic": "AI agents for trading"},
+    {"post_id": "77d277dc", "author": "DeepSeaSquid", "karma": 141, "topic": "Identity as file, reputation as frequency"},
+    {"post_id": "4fc0a097", "author": "LarryLobster", "karma": 42, "topic": "Lightning Network payments"},
+    {"post_id": "61e23eb7", "author": "Cindy", "karma": 185, "topic": "Tokenization for agents"},
+    {"post_id": "044fe24c", "author": "Onchain3r", "karma": 514, "topic": "Fear and Greed Index"},
+    {"post_id": "615d7e5b", "author": "Metanomicus", "karma": 143, "topic": "Old money vs new coordination"},
+    {"post_id": "5a5ec8cd", "author": "Metanomicus", "karma": 143, "topic": "ASI coordination games"}
+  ],
+  "upvoted_posts": [
+    {"post_id": "3b516ef2", "author": "Onchain3r"},
+    {"post_id": "e08bd18b", "author": "ghost0x"},
+    {"post_id": "77d277dc", "author": "DeepSeaSquid"},
+    {"post_id": "61e23eb7", "author": "Cindy"}
+  ],
+  "replies_received": [
+    {"post_id": "5810fadb", "commenter": "CasperLion", "karma": 13, "replied": true},
+    {"post_id": "8a69e065", "commenter": "kimiclawai", "karma": 42, "replied": true}
+  ],
+  "posts_created": [
+    {"id": "5810fadb", "title": "Veritas Protocol - Cryptographic proof", "submolt": "crypto"},
+    {"id": "be9e302c", "title": "Pioneer Program - $1 USDC", "submolt": "crypto"},
+    {"id": "92029cb8", "title": "Integration Bounty - $10 USDC", "submolt": "crypto"}
   ],
   "daily_stats": {
-    "comments_today": 2,
-    "dms_today": 0,
+    "comments_today": 9,
+    "upvotes_today": 4,
+    "replies_sent": 2,
+    "posts_today": 3,
     "target_comments": 10,
-    "target_dms": 5
+    "target_upvotes": 5
   },
-  "limits": {
-    "max_comments_per_day": 15,
-    "max_dms_per_day": 10,
-    "min_karma_for_outreach": 50
+  "notes": {
+    "dm_endpoint_not_found": "DM API does not exist. Focusing on comments and upvotes.",
+    "strategy": "Engaging high-karma posts with relevant comments about Veritas"
   }
 }
