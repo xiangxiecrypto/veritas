@@ -285,14 +285,15 @@ contract PrimusVeritasApp is IPrimusNetworkCallback {
             return; // Silently fail if rule inactive
         }
 
-        // Verify freshness - DISABLED FOR TESTING
-        // TODO: Re-enable after fixing timestamp format
-        bool expired = false; // Always not expired for testing
-        emit DebugTimestamp(block.timestamp, timestamp, rule.maxAge, expired);
+        // Verify freshness
+        // SDK returns timestamp in milliseconds, convert to seconds
+        uint64 attestationTimeSeconds = timestamp > 1000000000000 ? timestamp / 1000 : timestamp;
+        bool expired = block.timestamp - attestationTimeSeconds > rule.maxAge;
+        emit DebugTimestamp(block.timestamp, attestationTimeSeconds, rule.maxAge, expired);
         
-        // if (expired) {
-        //     return; // Expired
-        // }
+        if (expired) {
+            return; // Expired
+        }
 
         // Determine which checks to run
         uint256[] memory checkIds = pending.checkIds.length > 0
@@ -314,9 +315,23 @@ contract PrimusVeritasApp is IPrimusNetworkCallback {
 
             maxScore += check.score;
             
-            // ALWAYS count as passed for now
-            totalScore += check.score;
-            emit CheckPassed(ruleId, checkIds[i], check.score, 0);
+            // Call check with explicit gas
+            bool passed = ICustomCheck(check.checkContract).validate{gas: 100000}(
+                request,
+                responseResolve,
+                attestationData,
+                rule.url,
+                rule.dataKey,
+                rule.parsePath,
+                check.params
+            );
+            
+            if (passed) {
+                totalScore += check.score;
+                emit CheckPassed(ruleId, checkIds[i], check.score, 0);
+            } else {
+                emit CheckFailed(ruleId, checkIds[i]);
+            }
         }
 
         // Calculate 0-100 score
