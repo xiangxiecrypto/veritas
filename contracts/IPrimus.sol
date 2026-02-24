@@ -17,6 +17,7 @@ struct Attestation {
     bytes request;
     bytes responseResolve;
     string data;
+    bytes32 sig;  // Fixed-size signature field
     uint64 timestamp;
 }
 

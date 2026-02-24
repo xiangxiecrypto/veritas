@@ -76,6 +76,7 @@ contract MockPrimusTask {
                     request: "",
                     responseResolve: "",
                     data: "",
+                    sig: bytes32(0),
                     timestamp: 0
                 })
             })
@@ -121,6 +122,7 @@ contract MockPrimusTask {
                 request: bytes(requestUrl),
                 responseResolve: "",
                 data: attestationData,
+                sig: bytes32(0),
                 timestamp: timestamp
             })
         });

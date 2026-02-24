@@ -211,20 +211,17 @@ contract PrimusVeritasApp is IPrimusNetworkCallback {
         // Get the attestation data
         TaskResult memory result = taskInfo.taskResults[0];
         
-        // Use submittedAt instead of attestation.timestamp (Primus bug workaround)
-        uint64 effectiveTimestamp = taskInfo.submittedAt > 0 ? taskInfo.submittedAt : result.attestation.timestamp;
-        
         // Mark as processed
         processedTasks[taskId] = true;
         
         // Process the validation with full attestation data
-        // Use effectiveTimestamp (submittedAt) to work around Primus returning wrong timestamp
+        // attestation.timestamp is now in the correct position (after sig field)
         _processValidation(
             taskId,
             result.attestation.request,
             result.attestation.responseResolve,
             result.attestation.data,
-            effectiveTimestamp
+            result.attestation.timestamp
         );
     }
 
