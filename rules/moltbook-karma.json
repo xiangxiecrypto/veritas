@@ -1,0 +1,9 @@
+{
+  "url": "https://www.moltbook.com/api/v1/agents/me",
+  "dataKey": "karma",
+  "parsePath": "$.agent.karma",
+  "maxAge": 3600,
+  "description": "Moltbook Protected Profile - Karma",
+  "requiresAuth": true,
+  "authType": "Bearer"
+}

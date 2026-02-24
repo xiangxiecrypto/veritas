@@ -1,26 +1,37 @@
 const hre = require("hardhat");
 
 async function main() {
-  const APP = "0x5464AD99af47c74689de69822fcAaF830cb2D006";
-  const submitTx = "0x3f2895b52a963b89d06842bc7686392ad7b5e6724de0591d3b888349fd0d7408";
+  const [wallet] = await ethers.getSigners();
+  const REGISTRY = "0xAeFdE0707014b6540128d3835126b53F073fEd40";
+  const agentId = 1018;
   
-  const receipt = await hre.ethers.provider.getTransactionReceipt(submitTx);
-  const App = await hre.ethers.getContractFactory("PrimusVeritasApp");
-  const app = App.attach(APP);
+  const registry = new ethers.Contract(
+    REGISTRY,
+    [
+      "function getValidationCount(uint256 agentId) view returns (uint256)",
+      "function getValidation(uint256 agentId, uint256 index) view returns (tuple(uint256 ruleId, uint256 score, uint256 timestamp, bytes32 attestationHash))",
+      "function getTotalScore(uint256 agentId) view returns (uint256)"
+    ],
+    wallet
+  );
   
-  for (const log of receipt.logs) {
-    try {
-      const parsed = app.interface.parseLog({ topics: log.topics, data: log.data });
-      if (parsed.name === 'ValidationCompleted') {
-        console.log('Score:', parsed.args.score.toString());
-      }
-      if (parsed.name === 'CheckPassed') {
-        console.log('Check passed, score:', parsed.args.score.toString());
-      }
-      if (parsed.name === 'CheckFailed') {
-        console.log('Check failed');
-      }
-    } catch (e) {}
+  console.log('=== FINAL SCORE CHECK ===\n');
+  console.log('Agent ID:', agentId);
+  
+  try {
+    const validationCount = await registry.getValidationCount(agentId);
+    console.log('Validation Count:', validationCount.toString());
+    
+    if (validationCount.gt(0)) {
+      const validation = await registry.getValidation(agentId, validationCount.sub(1));
+      console.log('\nLatest Validation:');
+      console.log('  Rule ID:', validation.ruleId.toString());
+      console.log('  Score:', validation.score.toString());
+      console.log('  Timestamp:', new Date(validation.timestamp.toNumber() * 1000).toISOString());
+      console.log('  Attestation Hash:', validation.attestationHash);
+    }
+  } catch (e) {
+    console.log('Error:', e.message);
   }
 }
 

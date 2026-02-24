@@ -17,7 +17,7 @@ async function main() {
   const app = App.attach(APP);
   
   // Create fresh request
-  console.log('=== STEP 1: Request ===');
+  console.log('=== STEP 1: Fresh Request ===');
   const requestTx = await app.requestValidation(AGENT_ID, BTC_RULE_ID, [0], 1, { 
     value: fee,
     gasPrice: gasPrice.mul(3),
@@ -27,7 +27,9 @@ async function main() {
   const requestReceipt = await requestTx.wait();
   const event = requestReceipt.events.find(e => e.event === 'ValidationRequested');
   const taskId = event.args.taskId;
+  
   console.log('Task ID:', taskId);
+  console.log('Tx:', requestTx.hash);
   
   // Attest
   console.log('\n=== STEP 2: Attest ===');
@@ -52,35 +54,37 @@ async function main() {
     }]]
   }, 120000);
   
-  console.log('\n=== CRITICAL FIELDS ===');
-  console.log('Attestor:', result[0].attestor);
-  console.log('Task ID:', result[0].taskId);
-  console.log('Report Tx Hash:', result[0].reportTxHash);
-  console.log('Attestation Time:', result[0].attestationTime);
-  console.log('Data:', result[0].attestation.data);
+  console.log('\n=== ATTEST() RETURN VALUE ===');
+  console.log('Result type:', typeof result);
+  console.log('Is Array:', Array.isArray(result));
+  console.log('Length:', result.length);
   
-  // Check if reportTxHash exists
-  if (result[0].reportTxHash && result[0].reportTxHash !== '') {
-    console.log('\n✅ Attestor submitted on-chain!');
-    console.log('   Tx Hash:', result[0].reportTxHash);
-    
-    // Wait for confirmation
-    console.log('\n⏳ Waiting for transaction confirmation...');
-    try {
-      const receipt = await ethers.provider.waitForTransaction(result[0].reportTxHash, 1, 60000);
-      console.log('✅ Transaction confirmed!');
-      console.log('   Block:', receipt.blockNumber);
-      console.log('   Status:', receipt.status === 1 ? 'SUCCESS' : 'FAILED');
-    } catch (e) {
-      console.log('⚠️ Transaction not found or pending');
-    }
-  } else {
-    console.log('\n❌ No reportTxHash - attestor did NOT submit on-chain!');
-    console.log('   This means we need to submit manually or wait');
+  // Check structure
+  console.log('\n=== result[0] Structure ===');
+  console.log('Keys:', Object.keys(result[0]));
+  
+  if (result[0].taskResult) {
+    console.log('\n=== taskResult ===');
+    console.log('Keys:', Object.keys(result[0].taskResult));
+    console.log('Attestor:', result[0].taskResult.attestor);
+    console.log('Task ID:', result[0].taskResult.taskId);
   }
   
-  // Check task status
-  console.log('\n=== STEP 3: Task Status ===');
+  console.log('\n=== attestation ===');
+  const attestation = result[0].attestation;
+  console.log('Keys:', Object.keys(attestation));
+  console.log('\nFull attestation:');
+  console.log(JSON.stringify(attestation, (key, value) => {
+    if (typeof value === 'string' && value.length > 100) {
+      return value.slice(0, 100) + '...';
+    }
+    return value;
+  }, 2));
+  
+  // Check if attestor submitted on-chain
+  console.log('\n=== STEP 3: Check On-Chain Status ===');
+  await new Promise(r => setTimeout(r, 5000));
+  
   const PRIMUS_TASK = "0xC02234058caEaA9416506eABf6Ef3122fCA939E8";
   const taskResult = await wallet.call({
     to: PRIMUS_TASK,
@@ -89,6 +93,8 @@ async function main() {
   
   const status = parseInt(taskResult.slice(-2), 16);
   console.log('Task Status:', status, '(0=INIT, 1=SUCCESS)');
+  
+  console.log('\n📝 SAVE THIS TASK ID:', taskId);
 }
 
 main().catch(console.error);

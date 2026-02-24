@@ -1,56 +1,56 @@
 const hre = require("hardhat");
-const { ethers } = hre;
-
-const APP = "0x68c75b005C651D829238938d61bB25D75Cc4643E";
-const PRIMUS_TASK = '0xC02234058caEaA9416506eABf6Ef3122fCA939E8';
-
-const TASK_ABI = [
-  "function queryTask(bytes32) view returns (tuple(uint8 taskStatus, bytes32 taskId, address sender, string templateId, address[] attestors, uint64 submittedAt, tuple(bytes request, bytes responseResolve, string data, uint64 timestamp, bytes32 sig)[] taskResults))",
-  "function queryLatestFeeInfo(uint8) view returns (tuple(uint256 primusFee, uint256 attestorFee))"
-];
 
 async function main() {
   const [wallet] = await ethers.getSigners();
+  const taskId = "0x17fcfc46b8ac6faed3f5867c90c121f338151db7e5b1b5dc3c9fa2ea7dae2895";
+  const PRIMUS_TASK = "0xC02234058caEaA9416506eABf6Ef3122fCA939E8";
+  const APP = "0xaE7F684251dfA767e2Ed05AD3D4768B3E2935f4e";
   
-  // Use existing task
-  const taskId = "0x8fb6cda8019a8322b01f74714ee4a73a862277d19f710d21229a1a2f1ef34d32";
-  const primusTaskId = "0x0045527d4c96bf3296238a4efbf60a0ce04b9806a0a534c92f251ba626adbfc9";
+  // Check task status
+  const taskResult = await wallet.call({
+    to: PRIMUS_TASK,
+    data: '0x8d3943ec' + ethers.utils.defaultAbiCoder.encode(['bytes32'], [taskId]).slice(2)
+  });
   
-  console.log('\n🔍 Checking Task Status\n');
+  const status = parseInt(taskResult.slice(-2), 16);
+  console.log('Task Status:', status, '(0=INIT, 1=SUCCESS)');
   
-  const taskContract = new ethers.Contract(PRIMUS_TASK, TASK_ABI, wallet);
-  const taskInfo = await taskContract.queryTask(primusTaskId);
-  
-  console.log('Task Status:', taskInfo.taskStatus, ['PENDING', 'SUCCESS', 'FAILED'][taskInfo.taskStatus] || 'UNKNOWN');
-  console.log('Results count:', taskInfo.taskResults.length);
-  
-  if (taskInfo.taskResults.length > 0) {
-    const result = taskInfo.taskResults[0];
-    console.log('\nAttestation:');
-    console.log('  Data:', result.data);
-    console.log('  Timestamp:', result.timestamp);
-  }
-  
-  // If SUCCESS, try submitting
-  if (taskInfo.taskStatus === 1) {
-    console.log('\n📦 Submitting...');
+  if (status === 1) {
+    console.log('\n✅ Task is SUCCESS! Submitting attestation...');
     
+    const gasPrice = await ethers.provider.getGasPrice();
     const App = await hre.ethers.getContractFactory("PrimusVeritasApp");
     const app = App.attach(APP);
     
-    const gasPrice = await ethers.provider.getGasPrice();
     const submitTx = await app.submitAttestation(taskId, {
-      gasPrice: gasPrice.mul(3)
+      gasPrice: gasPrice.mul(3),
+      gasLimit: 1000000
     });
+    
+    console.log('⏳ Waiting for confirmation...');
     const receipt = await submitTx.wait();
     
-    const completedEvent = receipt.events.find(e => e.event === 'ValidationCompleted');
-    if (completedEvent) {
-      console.log('\n✅ SUCCESS!');
-      console.log('Score:', completedEvent.args.score.toString());
+    console.log('\n✅ Submitted!');
+    console.log('   Tx Hash:', submitTx.hash);
+    console.log('   Status:', receipt.status === 1 ? 'SUCCESS' : 'FAILED');
+    console.log('   Gas Used:', receipt.gasUsed.toString());
+    
+    // Parse events
+    console.log('\n📊 Events:');
+    for (const log of receipt.logs) {
+      try {
+        const parsed = app.interface.parseLog({ topics: log.topics, data: log.data });
+        console.log('   Event:', parsed.name);
+        
+        if (parsed.name === 'ValidationCompleted') {
+          console.log('     Agent ID:', parsed.args.agentId.toString());
+          console.log('     Score:', parsed.args.normalizedScore.toString());
+        }
+      } catch (e) {}
     }
   } else {
-    console.log('\n⏳ Task not successful yet. Wait a few seconds and retry.');
+    console.log('\n❌ Task still in INIT state');
+    console.log('   Primus has not submitted on-chain yet');
   }
 }
 
