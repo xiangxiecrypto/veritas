@@ -1,0 +1,12 @@
+{
+  "app": "0x09Ac6476C745271599E0BB55Ef9C9570Ac15f899",
+  "checks": {
+    "simple": "0x740e869df1e487058Dc584e8e28352b4e31eAf5d",
+    "karma": "0xE8918D03ce173d362605Ad4A97BcC495b9590EC4"
+  },
+  "rules": {
+    "btc": 0,
+    "karma": 1
+  },
+  "deployedAt": "2026-02-24T10:13:09.758Z"
+}
