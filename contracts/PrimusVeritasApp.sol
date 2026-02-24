@@ -6,6 +6,15 @@ import "./IPrimus.sol";
 import "./ICustomCheck.sol";
 
 /**
+ * @title IReputationRegistry
+ * @notice ERC-8004 Reputation Registry interface
+ */
+interface IReputationRegistry {
+    function giveFeedback(uint256 agentId, uint8 value) external;
+    function getReputation(uint256 agentId) external view returns (uint256);
+}
+
+/**
  * @title PrimusVeritasApp
  * @notice Main application for Primus zkTLS validation with auto-callback
  * @dev Implements IPrimusNetworkCallback for automatic attestation processing
@@ -14,6 +23,7 @@ contract PrimusVeritasApp is IPrimusNetworkCallback {
     address public owner;
     VeritasValidationRegistry public immutable registry;
     ITask public immutable primusTask;
+    IReputationRegistry public immutable reputationRegistry;
 
     struct VerificationRule {
         string url;             // URL to fetch data from (e.g., "https://api.coinbase.com/v2/exchange-rates?currency=BTC")
@@ -66,10 +76,11 @@ contract PrimusVeritasApp is IPrimusNetworkCallback {
         _;
     }
 
-    constructor(address _registry, address _primusTask) {
+    constructor(address _registry, address _primusTask, address _reputationRegistry) {
         owner = msg.sender;
         registry = VeritasValidationRegistry(_registry);
         primusTask = ITask(_primusTask);
+        reputationRegistry = IReputationRegistry(_reputationRegistry);
     }
 
     function transferOwnership(address newOwner) external onlyOwner {
@@ -352,6 +363,13 @@ contract PrimusVeritasApp is IPrimusNetworkCallback {
             // Registry call succeeded
         } catch {
             // Registry call failed - still emit completion event
+        }
+
+        // Call ERC-8004 ReputationRegistry.giveFeedback with the totalScore
+        try reputationRegistry.giveFeedback(pending.agentId, response) {
+            // giveFeedback succeeded
+        } catch {
+            // giveFeedback failed - still emit completion event
         }
 
         emit DebugComplete(taskId, response);
