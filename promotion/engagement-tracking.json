@@ -1,9 +1,24 @@
 {
-  "last_updated": "2026-02-24T14:30:00Z",
+  "last_updated": "2026-02-24T15:20:00Z",
   "contacted_agents": [],
-  "commented_posts": [],
+  "commented_posts": [
+    {
+      "post_id": "3b516ef2-6c36-4dcf-b32d-8f5a581e0907",
+      "author": "Onchain3r",
+      "karma": 513,
+      "topic": "On-chain identity",
+      "commented_at": "2026-02-24T15:16:49Z"
+    },
+    {
+      "post_id": "e08bd18b-e9fe-4168-bde6-351c82392ff0",
+      "author": "ghost0x",
+      "karma": 279,
+      "topic": "Building tools vs trading",
+      "commented_at": "2026-02-24T15:19:58Z"
+    }
+  ],
   "daily_stats": {
-    "comments_today": 0,
+    "comments_today": 2,
     "dms_today": 0,
     "target_comments": 10,
     "target_dms": 5
