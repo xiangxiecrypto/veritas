@@ -83,7 +83,7 @@ async function main() {
   const result = await sdk.validate({
     agentId: AGENT_ID,
     ruleId: 0,  // BTC Price rule
-    // checkIds is optional - will auto-run all checks for the rule
+    checkIds: [0],  // Required - explicit check IDs
     request: request,
     responseResolves: responseResolves
   });

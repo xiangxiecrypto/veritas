@@ -19,10 +19,11 @@
  * 
  * const responseResolves = VeritasSDK.createResponseResolve('value', '$.data.value');
  * 
- * // Validate (checkIds is optional - auto-runs all checks)
+ * // Validate (checkIds is required)
  * const result = await sdk.validate({
  *   agentId: 1234,
  *   ruleId: 0,
+ *   checkIds: [0],
  *   request: request,
  *   responseResolves: responseResolves
  * });
