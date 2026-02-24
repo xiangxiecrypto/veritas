@@ -4,24 +4,23 @@ pragma solidity ^0.8.0;
 /**
  * @title ICustomCheck
  * @notice Interface for custom check contracts
- * @dev Implement this interface to create custom validation checks
- *      Check contracts are reusable across different rules
+ * @dev Simplified interface with proper types
  */
 interface ICustomCheck {
     /**
      * @notice Validate attestation data
-     * @param attestationUrl The URL from the attestation (actual URL fetched, as bytes)
-     * @param attestationResponseResolve The responseResolve from attestation (contains keyName, parsePath)
+     * @param request Encoded AttNetworkRequest[] array
+     * @param responseResolves Encoded AttNetworkOneUrlResponseResolve[] array
      * @param attestationData The extracted data value from attestation
-     * @param ruleUrlTemplate The URL template from the rule (with * placeholder)
+     * @param ruleUrlTemplate The URL template from the rule
      * @param ruleDataKey The dataKey from the rule
      * @param ruleParsePath The parsePath from the rule
-     * @param params Custom parameters for this check (e.g., minFollowers threshold)
-     * @return passed Whether the check passed (score is determined by PrimusVeritasApp)
+     * @param params Custom parameters for this check
+     * @return passed Whether the check passed
      */
     function validate(
-        bytes calldata attestationUrl,
-        bytes calldata attestationResponseResolve,
+        bytes calldata request,
+        bytes calldata responseResolves,
         string calldata attestationData,
         string calldata ruleUrlTemplate,
         string calldata ruleDataKey,
