@@ -90,7 +90,7 @@ async function main() {
   const result = await sdk.validate({
     agentId: AGENT_ID,
     ruleId: 1,  // Moltbook karma rule
-    checkIds: [0],
+    // checkIds is optional - will auto-run all checks for the rule
     request: request,
     responseResolves: responseResolves
   });

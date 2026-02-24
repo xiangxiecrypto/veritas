@@ -225,7 +225,7 @@ class VeritasSDK {
    * @param {object} options - Validation options
    * @param {number|string} options.agentId - Agent ID
    * @param {number} options.ruleId - Rule ID
-   * @param {array} [options.checkIds=[0]] - Check IDs to run
+   * @param {array} [options.checkIds] - Check IDs to run (optional, defaults to all checks)
    * @param {number} [options.attestorCount=1] - Number of attestors
    * @param {object} options.request - Request configuration (Primus format)
    * @param {string} options.request.url - URL to attest
@@ -240,7 +240,7 @@ class VeritasSDK {
     const {
       agentId,
       ruleId,
-      checkIds = [0],
+      checkIds,  // Optional - will auto-fetch all checks if not provided
       attestorCount = 1,
       request,
       responseResolves,
@@ -253,6 +253,17 @@ class VeritasSDK {
     if (!request) throw new Error('request is required');
     if (!responseResolves) throw new Error('responseResolves is required');
 
+    // Auto-fetch all check IDs if not provided
+    let finalCheckIds = checkIds;
+    if (!finalCheckIds || finalCheckIds.length === 0) {
+      const checkCount = (await this.app.checkCount(ruleId)).toNumber();
+      finalCheckIds = [];
+      for (let i = 0; i < checkCount; i++) {
+        finalCheckIds.push(i);
+      }
+      console.log(`📋 Auto-detected ${finalCheckIds.length} checks for rule ${ruleId}`);
+    }
+
     const feeWei = ethers.utils.parseEther(fee);
 
     // Step 1: Request validation
@@ -261,7 +272,7 @@ class VeritasSDK {
     const requestTx = await this.app.requestValidation(
       agentId,
       ruleId,
-      checkIds,
+      finalCheckIds,
       attestorCount,
       { value: feeWei }
     );
