@@ -375,10 +375,10 @@ contract PrimusVeritasApp is IPrimusNetworkCallback {
             // Registry call failed - still emit completion event
         }
 
-        // Call ERC-8004 ReputationRegistry.giveFeedback with the normalized score (0-100)
+        // Call ERC-8004 ReputationRegistry.giveFeedback with the totalScore
         try reputationRegistry.giveFeedback(
             pending.agentId,
-            response,  // normalized score 0-100
+            uint8(uint256(int256(totalScore))),  // totalScore from checks (0-255)
             "",
             "",
             "",
