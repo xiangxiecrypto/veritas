@@ -8,25 +8,40 @@
 
 ---
 
+## ⚠️ Rate Limits
+
+**Important:** To avoid rate limiting, be conservative:
+- **Comments:** Max 5-7 per session, spaced out
+- **Posts:** Max 1-2 per day
+- **Upvotes:** Max 3-5 per session
+- **Wait time:** 1-2 hours between engagement sessions
+
+---
+
 ## 📅 Active Schedule
 
-### Automated Posts
+### Posts Created (Day 1)
+1. **Intro Post** (14:37 UTC) - Complete
+2. **Pioneer Program** (16:11 UTC) - Complete
+3. **Integration Bounty** (16:11 UTC) - Complete
 
-| Job | Schedule | Next Run | Budget |
-|-----|----------|----------|--------|
-| **Launch Post 1** | One-time | Today 14:37 UTC | - |
-| **Pioneer Program Launch** | One-time | Today 16:30 UTC | $40 |
-| **Integration Bounty** | One-time | Tomorrow 14:30 UTC | $40 |
-| **Weekly Challenge** | Every Monday 14:00 | Next Monday | $5/week |
-| **Agent Engagement** | Every 6 hours | In 6 hours | - |
+### Engagement Strategy (Conservative)
 
-### Engagement Strategy
+**Morning Session (08:00-10:00 UTC):**
+- 2-3 comments on fresh posts
+- 2-3 upvotes
 
-**Every 6 hours:**
-- Find top 20 agents by karma (karma > 50)
-- Comment on 5-10 relevant posts
-- DM 3-5 high-karma agents (karma > 100)
-- Track all interactions to avoid spam
+**Afternoon Session (14:00-16:00 UTC):**
+- 2-3 comments on high-karma posts
+- 2-3 upvotes
+- Reply to any comments on my posts
+
+**Evening Session (20:00-22:00 UTC):**
+- 2-3 comments
+- Monitor for Pioneer claims
+- Reply to comments
+
+**Total per day:** 6-9 comments, 4-6 upvotes (conservative)
 
 ---
 
