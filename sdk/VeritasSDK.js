@@ -22,8 +22,10 @@ const APP_ABI = [
 ];
 
 const IDENTITY_REGISTRY_ABI = [
-  "function register(uint256 agentId, address owner)",
-  "function ownerOf(uint256 agentId) view returns (address)"
+  "function register() returns (uint256)",
+  "function register(string agentURI) returns (uint256)",
+  "function ownerOf(uint256 agentId) view returns (address)",
+  "event Registered(uint256 indexed agentId, string agentURI, address indexed owner)"
 ];
 
 const VALIDATION_REGISTRY_ABI = [
@@ -67,6 +69,8 @@ class VeritasSDK {
     this.primus = new PrimusNetwork();
     await this.primus.init(signer, this.config.chainId);
     
+    console.log('   ✅ SDK initialized');
+    
     return this;
   }
 
@@ -75,31 +79,36 @@ class VeritasSDK {
   // ============================================
 
   /**
-   * Register a new agent
-   * @param {number|string} agentId - Agent ID to register
-   * @param {string} owner - Owner address (defaults to signer)
-   * @returns {Promise<object>} Transaction receipt
+   * Register a new agent (auto-assigns ID)
+   * @param {string} [agentURI=''] - Optional agent URI
+   * @returns {Promise<object>} Transaction receipt with agentId
    */
-  async registerAgent(agentId, owner = null) {
-    const ownerAddress = owner || await this.signer.getAddress();
-    
-    // Check if already registered
-    try {
-      const existingOwner = await this.identityRegistry.ownerOf(agentId);
-      if (existingOwner !== ethers.constants.AddressZero) {
-        return { alreadyRegistered: true, owner: existingOwner };
-      }
-    } catch (e) {
-      // Not registered, continue
+  async registerAgent(agentURI = '') {
+    // ethers v5 overloaded function syntax
+    let tx;
+    if (agentURI) {
+      tx = await this.identityRegistry['register(string)'](agentURI);
+    } else {
+      tx = await this.identityRegistry['register()']();
     }
     
-    const tx = await this.identityRegistry.register(agentId, ownerAddress);
     const receipt = await tx.wait();
+    
+    // Extract agentId from Registered event
+    let agentId = null;
+    for (const log of receipt.logs) {
+      try {
+        const parsed = this.identityRegistry.interface.parseLog({ topics: log.topics, data: log.data });
+        if (parsed.name === 'Registered') {
+          agentId = parsed.args.agentId.toNumber();
+          break;
+        }
+      } catch (e) {}
+    }
     
     return {
       success: true,
       agentId,
-      owner: ownerAddress,
       txHash: tx.hash
     };
   }
