@@ -29,17 +29,32 @@ async function main() {
   console.log('');
   
   // Check agent registration
-  console.log('📋 Checking agent registration...');
+  console.log('╔══════════════════════════════════════════════════════════════╗');
+  console.log('║  AGENT REGISTRATION                                          ║');
+  console.log('╚══════════════════════════════════════════════════════════════╝');
+  console.log('');
+  
   const agentInfo = await sdk.getAgentInfo(AGENT_ID);
+  console.log('📋 Checking agent', AGENT_ID, '...');
   
   if (agentInfo.registered) {
     console.log('   ✅ Agent already registered');
     console.log('   Owner:', agentInfo.owner);
     console.log('   Validations:', agentInfo.validationCount);
   } else {
-    console.log('   ⚠️ Agent not registered, registering...');
+    console.log('   ⚠️ Agent not registered');
+    console.log('   Registering agent...');
+    
     const regResult = await sdk.registerAgent(AGENT_ID);
-    console.log('   ✅ Agent registered:', regResult.txHash);
+    
+    if (regResult.alreadyRegistered) {
+      console.log('   ✅ Agent was already registered');
+      console.log('   Owner:', regResult.owner);
+    } else {
+      console.log('   ✅ Agent registered successfully!');
+      console.log('   Tx Hash:', regResult.txHash);
+      console.log('   Owner:', regResult.owner);
+    }
   }
   console.log('');
   
