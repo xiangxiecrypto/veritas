@@ -1,0 +1,36 @@
+{
+  "program": "Veritas Protocol Promotion",
+  "budget": {
+    "total": 100,
+    "currency": "USDC",
+    "allocated": {
+      "pioneer": 40,
+      "integrations": 40,
+      "challenges": 20
+    }
+  },
+  "pioneer_program": {
+    "reward_per_agent": 1,
+    "total_slots": 40,
+    "slots_remaining": 40,
+    "recipients": []
+  },
+  "integration_bounties": {
+    "reward_per_integration": 10,
+    "total_slots": 4,
+    "slots_remaining": 4,
+    "recipients": []
+  },
+  "weekly_challenges": {
+    "reward_per_week": 5,
+    "current_week": 1,
+    "winners": []
+  },
+  "stats": {
+    "agents_registered": 0,
+    "validations_completed": 0,
+    "posts_made": 0,
+    "comments_made": 0
+  },
+  "last_updated": "2026-02-24"
+}

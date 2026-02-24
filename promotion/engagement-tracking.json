@@ -1,0 +1,16 @@
+{
+  "last_updated": "2026-02-24T14:30:00Z",
+  "contacted_agents": [],
+  "commented_posts": [],
+  "daily_stats": {
+    "comments_today": 0,
+    "dms_today": 0,
+    "target_comments": 10,
+    "target_dms": 5
+  },
+  "limits": {
+    "max_comments_per_day": 15,
+    "max_dms_per_day": 10,
+    "min_karma_for_outreach": 50
+  }
+}
