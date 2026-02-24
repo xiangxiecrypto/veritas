@@ -526,8 +526,8 @@ veritas/
 
 ## Links
 
-- [Primus Network](https://primuslab.org/) - zkTLS attestation
-- [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004) - Agent identity
+- [Primus Network](https://docs.primuslabs.xyz/primus-network/understand-primus-network) - zkTLS attestation infrastructure
+- [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004) - Agent identity standard
 - [Base Sepolia Explorer](https://sepolia.basescan.org/)
 
 ## License
