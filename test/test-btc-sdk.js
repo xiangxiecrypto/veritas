@@ -7,8 +7,6 @@ const hre = require("hardhat");
 const { ethers } = hre;
 const { VeritasSDK } = require('../sdk/VeritasSDK');
 
-const AGENT_ID = 1018;
-
 async function main() {
   const [wallet] = await ethers.getSigners();
   
@@ -16,7 +14,6 @@ async function main() {
   console.log('           BTC PRICE VALIDATION TEST (Generic SDK)            ');
   console.log('════════════════════════════════════════════════════════════════');
   console.log('');
-  console.log('Agent ID:', AGENT_ID);
   console.log('Signer:', wallet.address);
   console.log('');
   
@@ -24,37 +21,19 @@ async function main() {
   console.log('🔧 Initializing VeritasSDK...');
   const sdk = new VeritasSDK();
   await sdk.init(wallet);
-  console.log('   ✅ SDK initialized');
   console.log('');
   
-  // Check agent registration
+  // Register a new agent for testing (or use existing)
   console.log('╔══════════════════════════════════════════════════════════════╗');
   console.log('║  AGENT REGISTRATION                                          ║');
   console.log('╚══════════════════════════════════════════════════════════════╝');
   console.log('');
   
-  const agentInfo = await sdk.getAgentInfo(AGENT_ID);
-  console.log('📋 Checking agent', AGENT_ID, '...');
-  
-  if (agentInfo.registered) {
-    console.log('   ✅ Agent already registered');
-    console.log('   Owner:', agentInfo.owner);
-    console.log('   Validations:', agentInfo.validationCount);
-  } else {
-    console.log('   ⚠️ Agent not registered');
-    console.log('   Registering agent...');
-    
-    const regResult = await sdk.registerAgent(AGENT_ID);
-    
-    if (regResult.alreadyRegistered) {
-      console.log('   ✅ Agent was already registered');
-      console.log('   Owner:', regResult.owner);
-    } else {
-      console.log('   ✅ Agent registered successfully!');
-      console.log('   Tx Hash:', regResult.txHash);
-      console.log('   Owner:', regResult.owner);
-    }
-  }
+  console.log('   Registering new agent for test...');
+  const regResult = await sdk.registerAgent();
+  const AGENT_ID = regResult.agentId;
+  console.log('   ✅ Agent registered:', AGENT_ID);
+  console.log('   Tx:', regResult.txHash);
   console.log('');
   
   // Get rules
@@ -93,6 +72,9 @@ async function main() {
   console.log('╔══════════════════════════════════════════════════════════════╗');
   console.log('║  RUNNING VALIDATION                                          ║');
   console.log('╚══════════════════════════════════════════════════════════════╝');
+  console.log('');
+  console.log('Agent ID:', AGENT_ID);
+  console.log('Rule ID: 0 (BTC Price)');
   console.log('');
   
   const result = await sdk.validate({

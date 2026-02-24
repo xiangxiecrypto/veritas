@@ -7,8 +7,9 @@ const hre = require("hardhat");
 const { ethers } = hre;
 const { VeritasSDK } = require('../sdk/VeritasSDK');
 
-const AGENT_ID = 1018;
-const MOLTBOOK_API_KEY = "moltbook_sk_QejPOPNRIt1Xqk7Uoh0I9MXUl-XnyucE";
+// Optional: Set MOLTBOOK_API_KEY env var for protected endpoint test
+// Without it, test will skip the validation
+const MOLTBOOK_API_KEY = process.env.MOLTBOOK_API_KEY || null;
 
 async function main() {
   const [wallet] = await ethers.getSigners();
@@ -17,45 +18,35 @@ async function main() {
   console.log('          MOLTBOOK KARMA VALIDATION TEST (Generic SDK)         ');
   console.log('════════════════════════════════════════════════════════════════');
   console.log('');
-  console.log('Agent ID:', AGENT_ID);
   console.log('Signer:', wallet.address);
   console.log('');
+  
+  // Check for API key
+  if (!MOLTBOOK_API_KEY) {
+    console.log('⚠️  MOLTBOOK_API_KEY not set - skipping protected endpoint test');
+    console.log('   Set env var: export MOLTBOOK_API_KEY=your_key');
+    console.log('   This test requires a valid Moltbook API key for protected endpoint');
+    console.log('');
+    return;
+  }
   
   // Initialize SDK
   console.log('🔧 Initializing VeritasSDK...');
   const sdk = new VeritasSDK();
   await sdk.init(wallet);
-  console.log('   ✅ SDK initialized');
   console.log('');
   
-  // Check agent registration
+  // Register a new agent for testing
   console.log('╔══════════════════════════════════════════════════════════════╗');
   console.log('║  AGENT REGISTRATION                                          ║');
   console.log('╚══════════════════════════════════════════════════════════════╝');
   console.log('');
   
-  const agentInfo = await sdk.getAgentInfo(AGENT_ID);
-  console.log('📋 Checking agent', AGENT_ID, '...');
-  
-  if (agentInfo.registered) {
-    console.log('   ✅ Agent already registered');
-    console.log('   Owner:', agentInfo.owner);
-    console.log('   Validations:', agentInfo.validationCount);
-  } else {
-    console.log('   ⚠️ Agent not registered');
-    console.log('   Registering agent...');
-    
-    const regResult = await sdk.registerAgent(AGENT_ID);
-    
-    if (regResult.alreadyRegistered) {
-      console.log('   ✅ Agent was already registered');
-      console.log('   Owner:', regResult.owner);
-    } else {
-      console.log('   ✅ Agent registered successfully!');
-      console.log('   Tx Hash:', regResult.txHash);
-      console.log('   Owner:', regResult.owner);
-    }
-  }
+  console.log('   Registering new agent for test...');
+  const regResult = await sdk.registerAgent();
+  const AGENT_ID = regResult.agentId;
+  console.log('   ✅ Agent registered:', AGENT_ID);
+  console.log('   Tx:', regResult.txHash);
   console.log('');
   
   // Get rules
@@ -100,6 +91,9 @@ async function main() {
   console.log('╔══════════════════════════════════════════════════════════════╗');
   console.log('║  RUNNING VALIDATION (Protected API)                          ║');
   console.log('╚══════════════════════════════════════════════════════════════╝');
+  console.log('');
+  console.log('Agent ID:', AGENT_ID);
+  console.log('Rule ID: 1 (Moltbook Karma)');
   console.log('');
   
   const result = await sdk.validate({
