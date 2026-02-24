@@ -7,10 +7,20 @@ import "./ICustomCheck.sol";
 
 /**
  * @title IReputationRegistry
- * @notice ERC-8004 Reputation Registry interface
+ * @notice ERC-8004 Reputation Registry interface (deployed version)
+ * @dev The deployed contract uses uint8 for value (not int128 as in standard)
  */
 interface IReputationRegistry {
-    function giveFeedback(uint256 agentId, uint256 value) external;
+    function giveFeedback(
+        uint256 agentId,
+        uint8 value,
+        string calldata tag1,
+        string calldata tag2,
+        string calldata endpoint,
+        string calldata feedbackURI,
+        bytes32 feedbackHash
+    ) external;
+    
     function getReputation(uint256 agentId) external view returns (uint256);
 }
 
@@ -365,8 +375,16 @@ contract PrimusVeritasApp is IPrimusNetworkCallback {
             // Registry call failed - still emit completion event
         }
 
-        // Call ERC-8004 ReputationRegistry.giveFeedback with the totalScore
-        try reputationRegistry.giveFeedback(pending.agentId, uint256(int256(totalScore))) {
+        // Call ERC-8004 ReputationRegistry.giveFeedback with the normalized score (0-100)
+        try reputationRegistry.giveFeedback(
+            pending.agentId,
+            response,  // normalized score 0-100
+            "",
+            "",
+            "",
+            "",
+            bytes32(0)
+        ) {
             // giveFeedback succeeded
         } catch {
             // giveFeedback failed - still emit completion event
