@@ -2,29 +2,58 @@
 pragma solidity ^0.8.0;
 
 // ============================================
-// PRIMUS NETWORK INTERFACES
+// PRIMUS NETWORK INTERFACES (Official)
 // ============================================
-// Matches the deployed Primus TaskContract on Base Sepolia
 
-struct FeeInfo {
-    uint256 primusFee;
-    uint256 attestorFee;
-    uint64 settedAt;
+/**
+ * @dev Structure for representing a network request
+ */
+struct AttNetworkRequest {
+    string url;
+    string header;
+    string method;
+    string body;
 }
 
+/**
+ * @dev Structure for resolving responses from a network request
+ */
+struct AttNetworkResponseResolve {
+    string keyName;
+    string parseType;
+    string parsePath;
+}
+
+/**
+ * @dev Structure for one URL's response resolve
+ */
+struct AttNetworkOneUrlResponseResolve {
+    AttNetworkResponseResolve[] oneUrlResponseResolve;
+}
+
+/**
+ * @dev Structure representing an attestation
+ */
 struct Attestation {
     address recipient;
-    bytes request;
-    bytes responseResolve;
+    AttNetworkRequest[] request;
+    AttNetworkOneUrlResponseResolve[] responseResolves;
     string data;
-    bytes32 sig;  // Fixed-size signature field
+    string attConditions;
     uint64 timestamp;
+    string additionParams;
 }
 
 struct TaskResult {
     address attestor;
     bytes32 taskId;
     Attestation attestation;
+}
+
+struct FeeInfo {
+    uint256 primusFee;
+    uint256 attestorFee;
+    uint64 settedAt;
 }
 
 enum TaskStatus {
@@ -41,7 +70,7 @@ struct TaskInfo {
     address[] attestors;
     TaskResult[] taskResults;
     uint64 submittedAt;
-    uint8 tokenSymbol;  // uint8 (0 = ETH)
+    uint8 tokenSymbol;
     address callback;
     TaskStatus taskStatus;
 }
@@ -51,7 +80,7 @@ interface ITask {
         address sender,
         string calldata templateId,
         uint256 attestorCount,
-        uint8 tokenSymbol,  // uint8 (0 = ETH) - matches deployed contract
+        uint8 tokenSymbol,
         address callback
     ) external payable returns (bytes32 taskId);
 

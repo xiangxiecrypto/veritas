@@ -73,11 +73,12 @@ contract MockPrimusTask {
                 taskId: bytes32(0),
                 attestation: Attestation({
                     recipient: address(0),
-                    request: "",
-                    responseResolve: "",
+                    request: new AttNetworkRequest[](0),
+                    responseResolves: new AttNetworkOneUrlResponseResolve[](0),
                     data: "",
-                    sig: bytes32(0),
-                    timestamp: 0
+                    attConditions: "",
+                    timestamp: 0,
+                    additionParams: ""
                 })
             })
         });
@@ -114,16 +115,39 @@ contract MockPrimusTask {
         require(task.status == TaskStatus.INIT, "Task not pending");
         require(task.callback != address(0), "No callback");
         
+        // Create request array with URL
+        AttNetworkRequest[] memory requests = new AttNetworkRequest[](1);
+        requests[0] = AttNetworkRequest({
+            url: requestUrl,
+            header: "",
+            method: "GET",
+            body: ""
+        });
+        
+        // Create response resolve array
+        AttNetworkResponseResolve[] memory resolves = new AttNetworkResponseResolve[](1);
+        resolves[0] = AttNetworkResponseResolve({
+            keyName: "btcPrice",
+            parseType: "json",
+            parsePath: "$.data.rates.USD"
+        });
+        
+        AttNetworkOneUrlResponseResolve[] memory oneUrlResolves = new AttNetworkOneUrlResponseResolve[](1);
+        oneUrlResolves[0] = AttNetworkOneUrlResponseResolve({
+            oneUrlResponseResolve: resolves
+        });
+        
         task.result = TaskResult({
             attestor: msg.sender,
             taskId: taskId,
             attestation: Attestation({
                 recipient: recipient,
-                request: bytes(requestUrl),
-                responseResolve: "",
+                request: requests,
+                responseResolves: oneUrlResolves,
                 data: attestationData,
-                sig: bytes32(0),
-                timestamp: timestamp
+                attConditions: "",
+                timestamp: timestamp,
+                additionParams: ""
             })
         });
         task.status = TaskStatus.SUCCESS;

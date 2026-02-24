@@ -215,11 +215,10 @@ contract PrimusVeritasApp is IPrimusNetworkCallback {
         processedTasks[taskId] = true;
         
         // Process the validation with full attestation data
-        // attestation.timestamp is now in the correct position (after sig field)
         _processValidation(
             taskId,
-            result.attestation.request,
-            result.attestation.responseResolve,
+            abi.encode(result.attestation.request),
+            abi.encode(result.attestation.responseResolves),
             result.attestation.data,
             result.attestation.timestamp
         );
@@ -246,11 +245,10 @@ contract PrimusVeritasApp is IPrimusNetworkCallback {
         processedTasks[taskId] = true;
 
         // Process the validation with full attestation data
-        // Primus returns timestamp in seconds (not milliseconds)
         _processValidation(
             taskId,
-            taskResult.attestation.request,
-            taskResult.attestation.responseResolve,
+            abi.encode(taskResult.attestation.request),
+            abi.encode(taskResult.attestation.responseResolves),
             taskResult.attestation.data,
             taskResult.attestation.timestamp
         );
