@@ -34,7 +34,7 @@ const VALIDATION_REGISTRY_ABI = [
  * VeritasSDK - Easy-to-use validation SDK
  */
 class VeritasSDK {
-  constructor(config) {
+  constructor(config = {}) {
     this.config = {
       // Default addresses (Base Sepolia)
       appAddress: config.appAddress || "0xC34E7059e1E891a4c42F9232D0162dCab92Fa0ec",
