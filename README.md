@@ -131,6 +131,124 @@ app.addRule(
 // Result: Uptime proof for SLA enforcement
 ```
 
+## 🔧 Fully Customizable Rules & Checks
+
+**Veritas is designed for maximum flexibility.** Define your own validation rules and create custom check logic for any use case.
+
+### Custom Rules
+
+Rules define **what** to validate from API responses:
+
+```solidity
+// Define any API endpoint
+app.addRule(
+    "https://your-api.com/endpoint",  // Any API URL
+    "value",                           // Data key to extract
+    "$.path.to.value",                 // JSONPath expression
+    decimals,                          // Precision
+    maxAge,                            // Freshness requirement
+    "Description"                      // Human-readable description
+);
+```
+
+**Rule Parameters:**
+
+| Parameter | Type | Description | Example |
+|-----------|------|-------------|---------|
+| `url` | string | API endpoint | `"https://api.coinbase.com/..."` |
+| `dataKey` | string | Key name for extraction | `"btcPrice"` |
+| `parsePath` | string | JSONPath to value | `"$.data.rates.USD"` |
+| `decimals` | uint8 | Decimal precision | `8` (for BTC) |
+| `maxAge` | uint256 | Max age in seconds | `3600` (1 hour) |
+| `description` | string | Human-readable label | `"Coinbase BTC Price"` |
+
+### Custom Checks
+
+Checks define **how** to validate the extracted data. Create your own validation logic:
+
+```solidity
+// Example: Threshold Check - Verify value meets minimum
+contract ThresholdCheck is ICustomCheck {
+    function validate(
+        bytes calldata request,
+        bytes calldata responseResolve,
+        bytes calldata attestationData,
+        string calldata url,
+        string calldata dataKey,
+        string calldata parsePath,
+        bytes calldata params  // Custom parameters!
+    ) external pure override returns (bool) {
+        // Decode your custom params
+        uint256 threshold = abi.decode(params, (uint256));
+        
+        // Extract value from attestation
+        uint256 value = extractValue(attestationData, dataKey);
+        
+        // Your validation logic
+        return value >= threshold;
+    }
+}
+```
+
+### Check Examples
+
+| Check Type | Use Case | Logic |
+|------------|----------|-------|
+| **SimpleVerificationCheck** | Basic validation | Verify URL, dataKey, parsePath match |
+| **ThresholdCheck** | Minimum values | Verify `value >= threshold` |
+| **RangeCheck** | Price bounds | Verify `min <= value <= max` |
+| **WhitelistCheck** | Allowed addresses | Verify address in whitelist |
+| **MoltbookKarmaCheck** | Reputation | Verify `karma > 0` |
+| **FollowerCheck** | Social proof | Verify `followers >= minFollowers` |
+
+### Adding Custom Checks
+
+```javascript
+// Deploy your check contract
+const ThresholdCheck = await ethers.getContractFactory("ThresholdCheck");
+const check = await ThresholdCheck.deploy();
+await check.deployed();
+
+// Add to rule with custom params
+const params = ethers.utils.defaultAbiCoder.encode(
+    ['uint256'],
+    [1000]  // Minimum threshold
+);
+
+await app.addCheck(
+    ruleId,          // Rule to attach to
+    check.address,   // Your check contract
+    params,          // Custom parameters
+    90               // Score weight
+);
+```
+
+### Combining Multiple Checks
+
+Rules can have multiple checks for comprehensive validation:
+
+```solidity
+// Rule: Price must be from trusted source AND within range
+app.addCheck(0, urlMatchCheck, "0x", 50);      // 50 points for URL match
+app.addCheck(0, rangeCheck, rangeParams, 30);  // 30 points for range
+app.addCheck(0, freshnessCheck, "0x", 20);     // 20 points for freshness
+
+// Total: 100 points if all pass
+```
+
+### Why Customizable?
+
+**Different use cases need different validation:**
+
+```
+DeFi Protocol:      "Price must be from Binance AND within 1% of median"
+AI Marketplace:     "Agent must have 100+ karma AND completed 50 tasks"
+Compliance:         "KYC verified AND jurisdiction in whitelist"
+Service Provider:   "Response time < 100ms AND 99.9% uptime"
+```
+
+**With Veritas, you define the rules.** See [CUSTOM_CHECK_DESIGN.md](./docs/CUSTOM_CHECK_DESIGN.md) for complete guide.
+
 ## Quick Start
 
 ### Install
