@@ -1,6 +1,6 @@
 /**
- * @title Test BTC Price Validation
- * @notice Test BTC price validation using VeritasSDK
+ * @title Test BTC Price Validation (Generic SDK)
+ * @notice Test BTC price validation using VeritasSDK with generic validate()
  */
 
 const hre = require("hardhat");
@@ -13,7 +13,7 @@ async function main() {
   const [wallet] = await ethers.getSigners();
   
   console.log('════════════════════════════════════════════════════════════════');
-  console.log('           BTC PRICE VALIDATION TEST (VeritasSDK)             ');
+  console.log('           BTC PRICE VALIDATION TEST (Generic SDK)            ');
   console.log('════════════════════════════════════════════════════════════════');
   console.log('');
   console.log('Agent ID:', AGENT_ID);
@@ -54,13 +54,43 @@ async function main() {
   }
   console.log('');
   
-  // Run validation
+  // Build request and responseResolves (Primus SDK format)
+  const request = VeritasSDK.createRequest(
+    'https://api.coinbase.com/v2/exchange-rates?currency=BTC'
+  );
+  
+  const responseResolves = VeritasSDK.createResponseResolve(
+    'btcPrice',
+    '$.data.rates.USD'
+  );
+  
+  console.log('📝 Request Config:');
+  console.log('   URL:', request.url);
+  console.log('   Method:', request.method);
+  console.log('');
+  
+  console.log('📝 Response Resolve:');
+  console.log('   keyName:', responseResolves[0][0].keyName);
+  console.log('   parsePath:', responseResolves[0][0].parsePath);
+  console.log('');
+  
+  // Run validation using generic validate()
   console.log('╔══════════════════════════════════════════════════════════════╗');
-  console.log('║  RUNNING BTC PRICE VALIDATION                               ║');
+  console.log('║  RUNNING VALIDATION                                          ║');
   console.log('╚══════════════════════════════════════════════════════════════╝');
   console.log('');
   
-  const result = await sdk.validateBTCPrice(AGENT_ID);
+  const result = await sdk.validate({
+    agentId: AGENT_ID,
+    ruleId: 0,  // BTC Price rule
+    checkIds: [0],
+    request: request,
+    responseResolves: responseResolves
+  });
+  
+  // Extract BTC price from data
+  const btcMatch = result.data?.match(/"btcPrice":"([^"]+)"/);
+  const btcPrice = btcMatch ? btcMatch[1] : 'N/A';
   
   console.log('');
   console.log('╔══════════════════════════════════════════════════════════════╗');
@@ -72,6 +102,7 @@ async function main() {
   console.log('Request Tx:', result.requestTxHash);
   console.log('Callback Tx:', result.callbackTxHash);
   console.log('Data:', result.data);
+  console.log('BTC Price: $' + btcPrice);
   console.log('Score:', result.score, '/ 100');
   console.log('Normalized:', result.normalizedScore, '/ 100');
   console.log('Passed:', result.passed ? '✅ YES' : '❌ NO');

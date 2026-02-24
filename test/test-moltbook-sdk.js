@@ -1,6 +1,6 @@
 /**
- * @title Test Moltbook Karma Validation
- * @notice Test Moltbook karma validation using VeritasSDK
+ * @title Test Moltbook Karma Validation (Generic SDK)
+ * @notice Test Moltbook karma validation using VeritasSDK with generic validate()
  */
 
 const hre = require("hardhat");
@@ -14,7 +14,7 @@ async function main() {
   const [wallet] = await ethers.getSigners();
   
   console.log('════════════════════════════════════════════════════════════════');
-  console.log('          MOLTBOOK KARMA VALIDATION TEST (VeritasSDK)          ');
+  console.log('          MOLTBOOK KARMA VALIDATION TEST (Generic SDK)         ');
   console.log('════════════════════════════════════════════════════════════════');
   console.log('');
   console.log('Agent ID:', AGENT_ID);
@@ -55,15 +55,47 @@ async function main() {
   }
   console.log('');
   
-  // Run validation
+  // Build request and responseResolves (Primus SDK format)
+  const request = VeritasSDK.createRequest(
+    'https://www.moltbook.com/api/v1/agents/me',
+    {
+      header: {
+        "Authorization": `Bearer ${MOLTBOOK_API_KEY}`
+      }
+    }
+  );
+  
+  const responseResolves = VeritasSDK.createResponseResolve(
+    'karma',
+    '$.agent.karma'
+  );
+  
+  console.log('📝 Request Config:');
+  console.log('   URL:', request.url);
+  console.log('   Method:', request.method);
+  console.log('   Authorization:', request.header.Authorization?.slice(0, 25) + '...');
+  console.log('');
+  
+  console.log('📝 Response Resolve:');
+  console.log('   keyName:', responseResolves[0][0].keyName);
+  console.log('   parsePath:', responseResolves[0][0].parsePath);
+  console.log('');
+  
+  // Run validation using generic validate()
   console.log('╔══════════════════════════════════════════════════════════════╗');
-  console.log('║  RUNNING MOLTBOOK KARMA VALIDATION                          ║');
+  console.log('║  RUNNING VALIDATION (Protected API)                          ║');
   console.log('╚══════════════════════════════════════════════════════════════╝');
   console.log('');
   
-  const result = await sdk.validateMoltbookKarma(AGENT_ID, MOLTBOOK_API_KEY);
+  const result = await sdk.validate({
+    agentId: AGENT_ID,
+    ruleId: 1,  // Moltbook karma rule
+    checkIds: [0],
+    request: request,
+    responseResolves: responseResolves
+  });
   
-  // Extract karma
+  // Extract karma from data
   const karmaMatch = result.data?.match(/"karma":"?(\d+)"?/);
   const karma = karmaMatch ? parseInt(karmaMatch[1]) : 0;
   

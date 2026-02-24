@@ -30,11 +30,6 @@ const VALIDATION_REGISTRY_ABI = [
   "function getAgentValidations(uint256 agentId) view returns (bytes32[] memory)"
 ];
 
-const REPUTATION_REGISTRY_ABI = [
-  "function giveFeedback(uint256 agentId, uint8 value, string tag1, string tag2, string endpoint, string feedbackURI, bytes32 feedbackHash)",
-  "function getReputation(uint256 agentId) view returns (uint256)"
-];
-
 /**
  * VeritasSDK - Easy-to-use validation SDK
  */
@@ -67,7 +62,6 @@ class VeritasSDK {
     this.app = new ethers.Contract(this.config.appAddress, APP_ABI, signer);
     this.identityRegistry = new ethers.Contract(this.config.identityRegistry, IDENTITY_REGISTRY_ABI, signer);
     this.validationRegistry = new ethers.Contract(this.config.validationRegistry, VALIDATION_REGISTRY_ABI, signer);
-    this.reputationRegistry = new ethers.Contract(this.config.reputationRegistry, REPUTATION_REGISTRY_ABI, signer);
     
     // Initialize Primus SDK
     this.primus = new PrimusNetwork();
@@ -223,12 +217,23 @@ class VeritasSDK {
   }
 
   // ============================================
-  // VALIDATION
+  // VALIDATION (GENERIC)
   // ============================================
 
   /**
    * Request validation and run full attestation flow
    * @param {object} options - Validation options
+   * @param {number|string} options.agentId - Agent ID
+   * @param {number} options.ruleId - Rule ID
+   * @param {array} [options.checkIds=[0]] - Check IDs to run
+   * @param {number} [options.attestorCount=1] - Number of attestors
+   * @param {object} options.request - Request configuration (Primus format)
+   * @param {string} options.request.url - URL to attest
+   * @param {string} [options.request.method='GET'] - HTTP method
+   * @param {object} [options.request.header={}] - HTTP headers
+   * @param {string} [options.request.body=''] - Request body
+   * @param {array} options.responseResolves - Response resolve config (Primus format)
+   * @param {string} [options.fee='0.00000001'] - Fee in ETH
    * @returns {Promise<object>} Validation result
    */
   async validate(options) {
@@ -237,12 +242,18 @@ class VeritasSDK {
       ruleId,
       checkIds = [0],
       attestorCount = 1,
-      url,
-      dataKey,
-      parsePath,
-      headers = {},
-      fee = ethers.utils.parseEther("0.00000001")
+      request,
+      responseResolves,
+      fee = '0.00000001'
     } = options;
+
+    // Validate required fields
+    if (!agentId) throw new Error('agentId is required');
+    if (ruleId === undefined) throw new Error('ruleId is required');
+    if (!request) throw new Error('request is required');
+    if (!responseResolves) throw new Error('responseResolves is required');
+
+    const feeWei = ethers.utils.parseEther(fee);
 
     // Step 1: Request validation
     console.log(`📝 Requesting validation for agent ${agentId}, rule ${ruleId}...`);
@@ -252,7 +263,7 @@ class VeritasSDK {
       ruleId,
       checkIds,
       attestorCount,
-      { value: fee }
+      { value: feeWei }
     );
     
     const requestReceipt = await requestTx.wait();
@@ -261,28 +272,28 @@ class VeritasSDK {
     
     console.log(`✅ Task created: ${taskId}`);
 
-    // Step 2: Run attestation
+    // Step 2: Run attestation using Primus SDK format
     console.log(`⏳ Running attestation...`);
     
-    const attestResult = await this.primus.attest({
+    // Build Primus attest params
+    const attestParams = {
       address: await this.signer.getAddress(),
       taskId: taskId,
       taskTxHash: requestTx.hash,
       taskAttestors: ['0x0DE886e31723e64Aa72e51977B14475fB66a9f72'],
       requests: [{
-        url: url,
-        method: "GET",
-        header: headers,
-        body: ""
+        url: request.url,
+        method: request.method || 'GET',
+        header: request.header || {},
+        body: request.body || ''
       }],
-      responseResolves: [[{
-        keyName: dataKey,
-        parseType: "json",
-        parsePath: parsePath
-      }]]
-    }, 120000);
+      responseResolves: responseResolves
+    };
+
+    const attestResult = await this.primus.attest(attestParams, 120000);
 
     const data = attestResult[0].attestation.data;
+    const timestamp = attestResult[0].attestation.timestamp;
     console.log(`✅ Attestation complete: ${data}`);
 
     // Step 3: Wait for auto-callback
@@ -307,6 +318,10 @@ class VeritasSDK {
             score = parsed.args.score.toNumber();
           }
           
+          if (parsed.name === 'CheckFailed') {
+            passed = false;
+          }
+          
           if (parsed.name === 'ValidationCompleted') {
             normalizedScore = parsed.args.score;
           }
@@ -321,6 +336,7 @@ class VeritasSDK {
         requestTxHash: requestTx.hash,
         callbackTxHash: reportTxHash,
         data,
+        timestamp,
         score,
         normalizedScore,
         passed
@@ -334,44 +350,8 @@ class VeritasSDK {
   }
 
   // ============================================
-  // CONVENIENCE METHODS
+  // UTILITY METHODS
   // ============================================
-
-  /**
-   * Validate BTC price (pre-configured)
-   * @param {number} agentId - Agent ID
-   * @returns {Promise<object>} Validation result
-   */
-  async validateBTCPrice(agentId) {
-    return this.validate({
-      agentId,
-      ruleId: 0,  // BTC Price rule
-      checkIds: [0],
-      url: "https://api.coinbase.com/v2/exchange-rates?currency=BTC",
-      dataKey: "btcPrice",
-      parsePath: "$.data.rates.USD"
-    });
-  }
-
-  /**
-   * Validate Moltbook karma (pre-configured)
-   * @param {number} agentId - Agent ID
-   * @param {string} apiKey - Moltbook API key
-   * @returns {Promise<object>} Validation result
-   */
-  async validateMoltbookKarma(agentId, apiKey) {
-    return this.validate({
-      agentId,
-      ruleId: 1,  // Moltbook karma rule
-      checkIds: [0],
-      url: "https://www.moltbook.com/api/v1/agents/me",
-      dataKey: "karma",
-      parsePath: "$.agent.karma",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`
-      }
-    });
-  }
 
   /**
    * Get validation history for agent
@@ -381,6 +361,36 @@ class VeritasSDK {
   async getValidationHistory(agentId) {
     const hashes = await this.validationRegistry.getAgentValidations(agentId);
     return hashes;
+  }
+
+  /**
+   * Create response resolve config (helper)
+   * @param {string} keyName - Key name for the extracted value
+   * @param {string} parsePath - JSON path to extract
+   * @param {string} [parseType='json'] - Parse type
+   * @returns {array} Response resolve array (Primus format)
+   */
+  static createResponseResolve(keyName, parsePath, parseType = 'json') {
+    return [[{
+      keyName,
+      parseType,
+      parsePath
+    }]];
+  }
+
+  /**
+   * Create request config (helper)
+   * @param {string} url - URL to request
+   * @param {object} [options] - Additional options
+   * @returns {object} Request object (Primus format)
+   */
+  static createRequest(url, options = {}) {
+    return {
+      url,
+      method: options.method || 'GET',
+      header: options.header || {},
+      body: options.body || ''
+    };
   }
 }
 

@@ -12,11 +12,20 @@
  * // Register agent
  * await sdk.registerAgent(1234);
  * 
- * // Validate BTC price
- * const result = await sdk.validateBTCPrice(1234);
+ * // Create request and response resolve
+ * const request = VeritasSDK.createRequest('https://api.example.com/data', {
+ *   header: { 'Authorization': 'Bearer token' }
+ * });
  * 
- * // Validate Moltbook karma
- * const result = await sdk.validateMoltbookKarma(1234, 'your-api-key');
+ * const responseResolves = VeritasSDK.createResponseResolve('value', '$.data.value');
+ * 
+ * // Validate
+ * const result = await sdk.validate({
+ *   agentId: 1234,
+ *   ruleId: 0,
+ *   request: request,
+ *   responseResolves: responseResolves
+ * });
  */
 
 const { VeritasSDK } = require('./VeritasSDK');
