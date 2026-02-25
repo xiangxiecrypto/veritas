@@ -1,5 +1,6 @@
 /**
  * Complete test using Veritas SDK
+ * Demonstrates attestation generation and on-chain validation
  */
 
 const { ethers } = require("hardhat");
@@ -157,7 +158,7 @@ async function main() {
   });
 
   await sdk.init();
-  console.log('✅ SDK initialized');
+  console.log('[OK] SDK initialized');
   console.log('');
 
   // Test 1: BTC Price Attestation
@@ -187,7 +188,7 @@ async function main() {
     ]
   );
 
-  console.log('✅ Attestation Generated');
+  console.log('[OK] Attestation Generated');
   console.log('');
   console.log('Attestation Metadata:');
   console.log('  Timestamp:', new Date(btcResult.timestamp * 1000).toISOString());
@@ -208,7 +209,7 @@ async function main() {
 
   const validation1 = await sdk.validate(btcResult.attestation, 1);
 
-  console.log('✅ Validation Complete');
+  console.log('[OK] Validation Complete');
   console.log('');
   console.log('Validation Result:');
   console.log('  Passed:', validation1.passed);
@@ -245,7 +246,7 @@ async function main() {
     ]
   );
 
-  console.log('✅ Attestation Generated');
+  console.log('[OK] Attestation Generated');
   console.log('');
   console.log('Attestation Metadata:');
   console.log('  Timestamp:', new Date(ethResult.timestamp * 1000).toISOString());
@@ -264,7 +265,7 @@ async function main() {
 
   const validation2 = await sdk.validate(ethResult.attestation, 2);
 
-  console.log('✅ Validation Complete');
+  console.log('[OK] Validation Complete');
   console.log('');
   console.log('Validation Result:');
   console.log('  Passed:', validation2.passed);

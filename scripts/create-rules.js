@@ -4,7 +4,7 @@ const config = require("../deployed-config.json");
 async function main() {
   const [signer] = await ethers.getSigners();
   console.log("\n========================================");
-  console.log("  创建规则");
+  console.log("  Create Rules");
   console.log("  ========================================");
   console.log("");
   
@@ -14,17 +14,17 @@ async function main() {
   const HTTPCheck = config.contracts.HTTPCheck;
   const JSONPathCheck = config.contracts.JSONPathCheck;
   
-  // 检查现有规则
+  // Check existing rules
   const nextId = await ruleRegistry.nextRuleId();
-  console.log("当前规则数:", parseInt(nextId.toString()) - 1);
+  console.log("Current rule count:", parseInt(nextId.toString()) - 1);
   
   if (parseInt(nextId.toString()) > 1) {
-    console.log("规则已存在，跳过创建");
+    console.log("Rules already exist, skipping creation");
     return;
   }
   
-  // 规则 1: Binance BTC
-  console.log("\n创建规则 1: Binance BTC Price");
+  // Rule 1: Binance BTC
+  console.log("\nCreating Rule 1: Binance BTC Price");
   const checkParams1 = ethers.AbiCoder.defaultAbiCoder().encode(
     ['tuple(string,bytes,bool,bool)'],
     [['GET', '0x7072696365', true, true]]
@@ -41,10 +41,10 @@ async function main() {
     3600
   );
   await tx1.wait();
-  console.log("✅ 规则 1 创建完成");
+  console.log("[OK] Rule 1 created");
   
-  // 规则 2: Binance ETH
-  console.log("\n创建规则 2: Binance ETH Price");
+  // Rule 2: Binance ETH
+  console.log("\nCreating Rule 2: Binance ETH Price");
   const tx2 = await ruleRegistry.createRule(
     'Binance ETH Price',
     'Verify ETH price from Binance API',
@@ -56,10 +56,10 @@ async function main() {
     1800
   );
   await tx2.wait();
-  console.log("✅ 规则 2 创建完成");
+  console.log("[OK] Rule 2 created");
   
   console.log("\n========================================");
-  console.log("✅ 所有规则创建完成！");
+  console.log("[OK] All rules created!");
   console.log("========================================");
 }
 

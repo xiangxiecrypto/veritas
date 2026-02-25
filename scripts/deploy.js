@@ -5,9 +5,9 @@ async function main() {
   
   const [deployer] = await ethers.getSigners();
   console.log("\n========================================");
-  console.log("  部署 Veritas Protocol");
+  console.log("  Deploy Veritas Protocol");
   console.log("  ========================================");
-  console.log("  部署账户:", deployer.address);
+  console.log("  Deployer:", deployer.address);
   console.log("");
   
   // 1. RuleRegistry
@@ -16,7 +16,7 @@ async function main() {
   const ruleRegistry = await RuleRegistry.deploy();
   await ruleRegistry.waitForDeployment();
   const rrAddr = await ruleRegistry.getAddress();
-  console.log("   地址:", rrAddr);
+  console.log("   Address:", rrAddr);
   
   // 2. HTTPCheck
   console.log("2. HTTPCheck...");
@@ -24,7 +24,7 @@ async function main() {
   const httpCheck = await HTTPCheck.deploy();
   await httpCheck.waitForDeployment();
   const hcAddr = await httpCheck.getAddress();
-  console.log("   地址:", hcAddr);
+  console.log("   Address:", hcAddr);
   
   // 3. JSONPathCheck
   console.log("3. JSONPathCheck...");
@@ -32,7 +32,7 @@ async function main() {
   const jsonPathCheck = await JSONPathCheck.deploy();
   await jsonPathCheck.waitForDeployment();
   const jpcAddr = await jsonPathCheck.getAddress();
-  console.log("   地址:", jpcAddr);
+  console.log("   Address:", jpcAddr);
   
   // 4. VeritasValidator
   console.log("4. VeritasValidator...");
@@ -40,13 +40,13 @@ async function main() {
   const validator = await VeritasValidator.deploy(rrAddr, PRIMUS_ZKTLS);
   await validator.waitForDeployment();
   const vAddr = await validator.getAddress();
-  console.log("   地址:", vAddr);
+  console.log("   Address:", vAddr);
   console.log("");
   
-  // 5. 创建示例规则
-  console.log("5. 创建示例规则...");
+  // 5. Create sample rules
+  console.log("5. Create sample rules...");
   
-  // 规则 1: Binance BTC
+  // Rule 1: Binance BTC
   const checkParams = ethers.AbiCoder.defaultAbiCoder().encode(
     ['tuple(string,bytes,bool,bool)'],
     [['GET', '0x7072696365', true, true]]
@@ -62,9 +62,9 @@ async function main() {
     checkParams,
     3600
   )).wait();
-  console.log("   ✅ 规则 1: Binance BTC Price");
+  console.log("   [OK] Rule 1: Binance BTC Price");
   
-  // 规则 2: Binance ETH
+  // Rule 2: Binance ETH
   await (await ruleRegistry.createRule(
     'Binance ETH Price',
     'Verify ETH price from Binance',
@@ -75,21 +75,21 @@ async function main() {
     checkParams,
     1800
   )).wait();
-  console.log("   ✅ 规则 2: Binance ETH Price");
+  console.log("   [OK] Rule 2: Binance ETH Price");
   
   console.log("");
   console.log("========================================");
-  console.log("✅ 部署完成！");
+  console.log("[OK] Deployment complete!");
   console.log("========================================");
   console.log("");
-  console.log("合约地址:");
+  console.log("Contract addresses:");
   console.log("  RuleRegistry:   ", rrAddr);
   console.log("  HTTPCheck:      ", hcAddr);
   console.log("  JSONPathCheck:  ", jpcAddr);
   console.log("  VeritasValidator:", vAddr);
   console.log("");
   
-  // 保存配置
+  // Save config
   const fs = require('fs');
   const config = {
     network: 'baseSepolia',
@@ -107,7 +107,7 @@ async function main() {
     }
   };
   fs.writeFileSync('deployed-config.json', JSON.stringify(config, null, 2));
-  console.log("配置已保存到: deployed-config.json");
+  console.log("Config saved to: deployed-config.json");
 }
 
 main().catch(console.error);

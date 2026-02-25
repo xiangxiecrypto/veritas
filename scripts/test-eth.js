@@ -1,3 +1,7 @@
+/**
+ * ETH Price Test
+ */
+
 const { ethers } = require("hardhat");
 const { PrimusCoreTLS } = require("@primuslabs/zktls-core-sdk");
 const config = require("../deployed-config.json");
@@ -105,7 +109,7 @@ async function main() {
   });
 
   await sdk.init();
-  console.log('✅ SDK initialized\n');
+  console.log('[OK] SDK initialized\n');
 
   // ETH Price Attestation
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -117,7 +121,7 @@ async function main() {
     [{ keyName: 'price', parseType: 'string', parsePath: '$.price' }]
   );
 
-  console.log('✅ Attestation Generated\n');
+  console.log('[OK] Attestation Generated\n');
   console.log('Timestamp:', new Date(result.timestamp * 1000).toISOString());
   console.log('Data:', result.responseData);
   console.log('Hash:', result.attestationHash);
@@ -131,7 +135,7 @@ async function main() {
 
   const validation = await sdk.validate(result.attestation, 2);
 
-  console.log('✅ Validation Complete\n');
+  console.log('[OK] Validation Complete\n');
   console.log('Result:');
   console.log('  Passed:', validation.passed);
   console.log('  Block:', validation.blockNumber);
