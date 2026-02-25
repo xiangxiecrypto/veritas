@@ -1,0 +1,15 @@
+{
+  "network": "baseSepolia",
+  "deployer": "0x89BBf3451643eef216c3A60d5B561c58F0D8adb9",
+  "contracts": {
+    "RuleRegistry": "0xA03F539830fD53A7E1345b2BC815f3A66e19bC35",
+    "HTTPCheck": "0xD3a3fA724C2436792a647528fb32fd38b7E94083",
+    "JSONPathCheck": "0x2E68F81b23cA61DFC251205283B7217654D73859",
+    "VeritasValidator": "0xca215CAaDa2d446481466b3D55eb152426065f9A",
+    "PrimusZKTLS": "0xCE7cefB3B5A7eB44B59F60327A53c9Ce53B0afdE"
+  },
+  "rules": {
+    "BinanceBTC": 1,
+    "BinanceETH": 2
+  }
+}

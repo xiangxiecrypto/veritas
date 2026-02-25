@@ -2,24 +2,12 @@
 pragma solidity ^0.8.20;
 
 /**
- * @title IPrimusZKTLS (Mock)
- * @notice Mock interface for Primus ZKTLS for testing purposes
- * @dev In production, use the real Primus contracts
+ * @title IPrimusZKTLS
+ * @notice Interface for Primus ZKTLS contract on Base Sepolia
+ * @dev Matches the actual Primus contract at 0xCE7cefB3B5A7eB44B59F60327A53c9Ce53B0afdE
  */
 interface IPrimusZKTLS {
     
-    struct Attestation {
-        address recipient;
-        AttNetworkRequest request;
-        AttNetworkResponseResolve[] reponseResolve;
-        string data;
-        string attConditions;
-        uint64 timestamp;
-        string additionParams;
-        Attestor[] attestors;
-        bytes[] signatures;
-    }
-
     struct AttNetworkRequest {
         string url;
         string header;
@@ -38,11 +26,22 @@ interface IPrimusZKTLS {
         string url;
     }
 
+    struct Attestation {
+        address recipient;
+        AttNetworkRequest request;
+        AttNetworkResponseResolve[] reponseResolve;
+        string data;
+        string attConditions;
+        uint64 timestamp;
+        string additionParams;
+        Attestor[] attestors;
+        bytes[] signatures;
+    }
+
     /**
      * @notice Verify an attestation
      * @param attestation The attestation to verify
-     * @dev In production, this verifies cryptographic signatures
-     *      For testing, this mock always returns true
+     * @dev Verifies cryptographic signatures from attestors
      */
     function verifyAttestation(Attestation calldata attestation) external view;
 }

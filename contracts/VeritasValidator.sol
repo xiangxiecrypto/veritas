@@ -2,18 +2,16 @@
 pragma solidity ^0.8.20;
 
 import "./mocks/IPrimusZKTLS.sol";
-import "./interfaces/ICheck.sol";
 import "./RuleRegistry.sol";
+import "./interfaces/ICustomCheck.sol";
 
 /**
  * @title VeritasValidator
- * @notice Core validation contract for Primus zktls attestations
- * @dev Validates attestations using Primus on-chain verification + custom checks
- * 
- * SECURITY: Only the attestation recipient can submit their own attestation
+ * @notice Generic validator compatible with ICustomCheck interface
+ * @dev Encodes attestation fields as bytes to avoid memory issues
  */
 contract VeritasValidator {
-    
+
     RuleRegistry public immutable ruleRegistry;
     address public immutable primusAddress;
     
@@ -41,41 +39,40 @@ contract VeritasValidator {
     error AlreadyValidated(bytes32 attestationHash);
     error PrimusVerificationFailed();
     error UnauthorizedRecipient(address expected, address actual);
+    error CheckValidationFailed();
+    error AttestationExpired(uint256 attestationTime, uint256 maxAge, uint256 currentTime);
     
     constructor(address _ruleRegistry, address _primusAddress) {
         require(_ruleRegistry != address(0), "Veritas: invalid registry");
         require(_primusAddress != address(0), "Veritas: invalid Primus address");
-        
         ruleRegistry = RuleRegistry(_ruleRegistry);
         primusAddress = _primusAddress;
     }
     
     /**
-     * @notice Validate a Primus attestation against a rule
-     * @param attestation The full attestation from Primus zktls-core-sdk
-     * @param ruleId The rule identifier
-     * @return passed Whether validation passed (true/false)
-     * @return attestationHash The hash of the attestation for reference
+     * @notice Validate attestation against a rule
+     * @param attestation Full attestation from Primus
+     * @param ruleId Rule identifier
      */
     function validate(
         IPrimusZKTLS.Attestation calldata attestation,
         uint256 ruleId
     ) external returns (bool passed, bytes32 attestationHash) {
         
-        // Check recipient authorization
+        // 1. Check recipient authorization
         if (attestation.recipient != msg.sender) {
             revert UnauthorizedRecipient(attestation.recipient, msg.sender);
         }
         
-        // Calculate attestation hash
+        // 2. Calculate attestation hash
         attestationHash = keccak256(abi.encode(attestation));
         
-        // Check if already validated
+        // 3. Check if already validated
         if (results[attestationHash].timestamp != 0) {
             revert AlreadyValidated(attestationHash);
         }
         
-        // Get the rule
+        // 4. Get rule
         RuleRegistry.Rule memory rule = ruleRegistry.getRule(ruleId);
         
         if (rule.id == 0) {
@@ -86,24 +83,54 @@ contract VeritasValidator {
             revert RuleNotActive(ruleId);
         }
         
-        // Verify attestation with Primus
+        // 5. Check timestamp (age verification)
+        uint64 attestationTime = attestation.timestamp / 1000;
+        uint256 currentTime = block.timestamp;
+        
+        if (currentTime > attestationTime + rule.maxAge) {
+            revert AttestationExpired(attestationTime, rule.maxAge, currentTime);
+        }
+        
+        // 6. Verify attestation with Primus ZKTLS
         try IPrimusZKTLS(primusAddress).verifyAttestation(attestation) {
             // Primus verification passed
         } catch {
             revert PrimusVerificationFailed();
         }
         
-        // Execute custom check
-        ICheck check = ICheck(rule.checkContract);
+        // 7. Encode attestation fields as bytes (avoid dynamic array issues)
+        bytes memory encodedRequest = encodeRequest(attestation.request);
+        bytes memory encodedResponseResolves = encodeResponseResolves(attestation.reponseResolve);
         
-        bytes memory attestationData = abi.encode(attestation);
+        // 8. Extract first parsePath and dataKey
+        string memory parsePath = "";
+        string memory dataKey = "";
+        if (attestation.reponseResolve.length > 0) {
+            parsePath = attestation.reponseResolve[0].parsePath;
+            dataKey = attestation.reponseResolve[0].keyName;
+        }
         
-        passed = check.validate(
-            attestationData,
+        // 9. Call external check contract with encoded data
+        // Pass rule's expected dataKey and parsePath for validation
+        try ICustomCheck(rule.checkContract).validate(
+            encodedRequest,
+            encodedResponseResolves,
+            attestation.data,
+            rule.urlTemplate,
+            rule.expectedDataKey,      // Rule's expected dataKey
+            rule.expectedParsePath,    // Rule's expected parsePath
             rule.checkData
-        );
+        ) returns (bool checkPassed) {
+            passed = checkPassed;
+        } catch {
+            revert CheckValidationFailed();
+        }
         
-        // Store result
+        if (!passed) {
+            revert CheckValidationFailed();
+        }
+        
+        // 10. Store result
         results[attestationHash] = ValidationResult({
             ruleId: ruleId,
             passed: passed,
@@ -116,6 +143,29 @@ contract VeritasValidator {
         emit ValidationPerformed(attestationHash, ruleId, passed, attestation.recipient, msg.sender);
         
         return (passed, attestationHash);
+    }
+    
+    /**
+     * @notice Encode AttNetworkRequest to bytes (simplified - only url and method)
+     */
+    function encodeRequest(
+        IPrimusZKTLS.AttNetworkRequest calldata request
+    ) internal pure returns (bytes memory) {
+        // Only encode essential fields to avoid stack issues
+        return abi.encode(request.url, request.method);
+    }
+    
+    /**
+     * @notice Encode AttNetworkResponseResolve[] to bytes (simplified)
+     */
+    function encodeResponseResolves(
+        IPrimusZKTLS.AttNetworkResponseResolve[] calldata resolves
+    ) internal pure returns (bytes memory) {
+        // Encode count and first resolve only (to avoid memory issues)
+        if (resolves.length == 0) {
+            return abi.encode(uint256(0));
+        }
+        return abi.encode(resolves.length, resolves[0].keyName, resolves[0].parsePath);
     }
     
     function getValidationResult(bytes32 attestationHash) external view returns (
@@ -133,9 +183,5 @@ contract VeritasValidator {
             result.recipient,
             result.validator
         );
-    }
-    
-    function isValidated(bytes32 attestationHash) external view returns (bool) {
-        return results[attestationHash].timestamp != 0;
     }
 }

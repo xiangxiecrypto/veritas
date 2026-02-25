@@ -1,57 +1,68 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "../mocks/IPrimusZKTLS.sol";
-import "../interfaces/ICheck.sol";
+import "../interfaces/ICustomCheck.sol";
 
 /**
  * @title HTTPCheck
- * @notice Check contract for HTTP API calls
- * @dev Validates HTTP request/response from Primus attestation
+ * @notice HTTP validation check compatible with ICustomCheck
  */
-contract HTTPCheck is ICheck {
+contract HTTPCheck is ICustomCheck {
     
-    struct HTTPCheckData {
-        string expectedUrl;
+    struct HTTPCheckParams {
         string expectedMethod;
-        uint256 minResponseCode;
-        uint256 maxResponseCode;
         bytes expectedDataPattern;
         bool validateParsePath;
+        bool validateDataKey;
     }
     
     function validate(
-        bytes calldata attestationData,
-        bytes calldata checkData
+        bytes calldata request,
+        bytes calldata responseResolves,
+        string calldata attestationData,
+        string calldata ruleUrlTemplate,
+        string calldata ruleDataKey,
+        string calldata ruleParsePath,
+        bytes calldata params
     ) external pure override returns (bool passed) {
         
-        IPrimusZKTLS.Attestation memory attestation = abi.decode(
-            attestationData,
-            (IPrimusZKTLS.Attestation)
-        );
+        HTTPCheckParams memory checkParams = abi.decode(params, (HTTPCheckParams));
         
-        HTTPCheckData memory data = abi.decode(checkData, (HTTPCheckData));
+        // Decode request (simplified - only url and method)
+        (string memory url, string memory method) = abi.decode(request, (string, string));
         
-        // 1. Validate URL
-        if (!_matchUrl(attestation.request.url, data.expectedUrl)) {
+        // 1. URL pattern matching
+        if (!matchUrl(url, ruleUrlTemplate)) {
             return false;
         }
         
-        // 2. Validate method
-        if (!_matchMethod(attestation.request.method, data.expectedMethod)) {
+        // 2. Method check
+        if (!equalsIgnoreCase(method, checkParams.expectedMethod)) {
             return false;
         }
         
-        // 3. Validate parsePath if required
-        if (data.validateParsePath) {
-            if (!_validateParsePath(attestation)) {
+        // 3. Data pattern check
+        if (checkParams.expectedDataPattern.length > 0) {
+            if (!containsPattern(bytes(attestationData), checkParams.expectedDataPattern)) {
                 return false;
             }
         }
         
-        // 4. Validate data pattern if specified
-        if (data.expectedDataPattern.length > 0) {
-            if (!_matchPattern(bytes(attestation.data), data.expectedDataPattern)) {
+        // 4. ParsePath validation - check if rule's expected parsePath is set
+        if (checkParams.validateParsePath) {
+            if (bytes(ruleParsePath).length == 0) {
+                return false;
+            }
+        }
+        
+        // 5. DataKey validation - verify attestation has the expected key
+        if (checkParams.validateDataKey) {
+            if (bytes(ruleDataKey).length == 0) {
+                return false;
+            }
+            // Check if attestation data contains the expected dataKey
+            bytes memory keyPattern = abi.encodePacked('"', ruleDataKey, '"');
+            if (!containsPattern(bytes(attestationData), keyPattern)) {
                 return false;
             }
         }
@@ -59,110 +70,38 @@ contract HTTPCheck is ICheck {
         return true;
     }
     
-    function _validateParsePath(IPrimusZKTLS.Attestation memory attestation) 
-        internal 
-        pure 
-        returns (bool) 
-    {
-        for (uint256 i = 0; i < attestation.reponseResolve.length; i++) {
-            IPrimusZKTLS.AttNetworkResponseResolve memory resolve = attestation.reponseResolve[i];
-            
-            if (bytes(resolve.parsePath).length == 0) {
-                return false;
-            }
-            
-            if (!_isValidParseType(resolve.parseType)) {
-                return false;
-            }
-            
-            if (bytes(resolve.keyName).length == 0) {
-                return false;
-            }
-        }
-        
-        return true;
-    }
-    
-    function _isValidParseType(string memory parseType) 
-        internal 
-        pure 
-        returns (bool) 
-    {
-        bytes32 parseTypeHash = keccak256(bytes(parseType));
-        
-        return (parseTypeHash == keccak256("JSON") ||
-                parseTypeHash == keccak256("HTML") ||
-                parseTypeHash == keccak256("XML") ||
-                parseTypeHash == keccak256("TEXT"));
-    }
-    
-    function _matchUrl(
-        string memory url, 
-        string memory pattern
-    ) internal pure returns (bool) {
+    // Helper functions
+    function matchUrl(string memory url, string memory pattern) internal pure returns (bool) {
         bytes memory urlBytes = bytes(url);
         bytes memory patternBytes = bytes(pattern);
         
-        if (patternBytes.length == 1 && patternBytes[0] == '*') {
+        if (patternBytes.length == 0) return true;
+        if (keccak256(urlBytes) == keccak256(patternBytes)) return true;
+        
+        // Wildcard match (e.g., "https://api.binance.com/*")
+        if (patternBytes.length > 0 && patternBytes[patternBytes.length - 1] == 0x2a) {
+            if (urlBytes.length < patternBytes.length - 1) return false;
+            for (uint i = 0; i < patternBytes.length - 1; i++) {
+                if (urlBytes[i] != patternBytes[i]) return false;
+            }
             return true;
         }
-        
-        if (keccak256(urlBytes) == keccak256(patternBytes)) {
-            return true;
-        }
-        
-        if (patternBytes.length > 0 && 
-            patternBytes[patternBytes.length - 1] == '*') {
-            
-            bytes memory prefix = new bytes(patternBytes.length - 1);
-            for (uint i = 0; i < prefix.length; i++) {
-                prefix[i] = patternBytes[i];
-            }
-            
-            if (urlBytes.length >= prefix.length) {
-                bool isMatch = true;
-                for (uint i = 0; i < prefix.length; i++) {
-                    if (urlBytes[i] != prefix[i]) {
-                        isMatch = false;
-                        break;
-                    }
-                }
-                return isMatch;
-            }
-        }
-        
         return false;
     }
     
-    function _matchMethod(
-        string memory method, 
-        string memory expected
-    ) internal pure returns (bool) {
-        bytes memory methodBytes = bytes(method);
-        bytes memory expectedBytes = bytes(expected);
-        
-        if (methodBytes.length != expectedBytes.length) {
-            return false;
+    function equalsIgnoreCase(string memory a, string memory b) internal pure returns (bool) {
+        bytes memory aBytes = bytes(a);
+        bytes memory bBytes = bytes(b);
+        if (aBytes.length != bBytes.length) return false;
+        for (uint i = 0; i < aBytes.length; i++) {
+            if (toUpper(aBytes[i]) != toUpper(bBytes[i])) return false;
         }
-        
-        for (uint i = 0; i < methodBytes.length; i++) {
-            bytes1 m = _toUpper(methodBytes[i]);
-            bytes1 e = _toUpper(expectedBytes[i]);
-            if (m != e) {
-                return false;
-            }
-        }
-        
         return true;
     }
     
-    function _matchPattern(
-        bytes memory data, 
-        bytes memory pattern
-    ) internal pure returns (bool) {
+    function containsPattern(bytes memory data, bytes memory pattern) internal pure returns (bool) {
         if (pattern.length == 0) return true;
         if (data.length < pattern.length) return false;
-        
         for (uint i = 0; i <= data.length - pattern.length; i++) {
             bool found = true;
             for (uint j = 0; j < pattern.length; j++) {
@@ -173,14 +112,11 @@ contract HTTPCheck is ICheck {
             }
             if (found) return true;
         }
-        
         return false;
     }
     
-    function _toUpper(bytes1 b) internal pure returns (bytes1) {
-        if (b >= 0x61 && b <= 0x7A) {
-            return bytes1(uint8(b) - 32);
-        }
+    function toUpper(bytes1 b) internal pure returns (bytes1) {
+        if (b >= 0x61 && b <= 0x7A) return bytes1(uint8(b) - 32);
         return b;
     }
 }
