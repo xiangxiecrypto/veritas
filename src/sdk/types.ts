@@ -1,12 +1,12 @@
 /**
- * @fileoverview Type definitions for Veritas Protocol
- * @description Shared types for Veritas SDK and contracts
+ * @fileoverview Type definitions for Neat Veritas Protocol
+ * @description Shared types for Neat Veritas SDK and contracts
  */
 
 /**
  * Rule structure from RuleRegistry
  */
-export interface Rule {
+export interface NeatRule {
   id: bigint;
   name: string;
   description: string;
@@ -20,59 +20,67 @@ export interface Rule {
 /**
  * HTTP check data structure
  */
-export interface HTTPCheckData {
+export interface NeatHTTPCheckData {
   expectedUrl: string;
   expectedMethod: string;
   minResponseCode: number;
   maxResponseCode: number;
-  expectedResponsePattern: string;
+  expectedDataPattern: string;
+  validateParsePath: boolean;
 }
 
 /**
  * Validation result from VeritasValidator
  */
-export interface OnChainValidationResult {
+export interface NeatOnChainValidationResult {
   ruleId: bigint;
   passed: boolean;
   timestamp: bigint;
+  recipient: string;
+  validator: string;
 }
 
 /**
- * Attestation structure from zktls-core-sdk
+ * Attestation structure from Primus
  */
-export interface Attestation {
-  proof: string;
-  signature: string;
-  timestamp: number;
-  data: {
-    request: {
-      url: string;
-      method: string;
-      headers: Record<string, string>;
-      body: string;
-    };
-    response: {
-      status: number;
-      statusText: string;
-      headers: Record<string, string>;
-      body: string;
-    };
+export interface NeatAttestation {
+  recipient: string;
+  request: {
+    url: string;
+    method: string;
+    headers: string;
+    body: string;
   };
+  responseResolve: Array<{
+    keyName: string;
+    parseType: string;
+    parsePath: string;
+  }>;
+  data: string;
+  attConditions: string;
+  timestamp: number;
+  additionParams: string;
+  attestors: Array<{
+    attestorAddr: string;
+    url: string;
+  }>;
+  signatures: string[];
 }
 
 /**
  * Contract addresses for deployment
  */
-export interface DeploymentAddresses {
+export interface NeatDeploymentAddresses {
   ruleRegistry: string;
   veritasValidator: string;
   httpCheck: string;
+  primusZKTLS: string;
 }
 
 /**
  * Deployment configuration
  */
-export interface DeploymentConfig {
+export interface NeatDeploymentConfig {
   network: string;
   deployer: string;
   initialAdmin: string;

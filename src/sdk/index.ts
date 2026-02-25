@@ -1,24 +1,26 @@
 /**
- * @fileoverview Veritas SDK - Simplified verification protocol
- * @description SDK for generating and verifying attestations using zktls-core-sdk
- * @module @veritas/sdk
+ * @fileoverview Neat Veritas SDK - Simplified verification protocol
+ * @description Minimal SDK for generating and verifying attestations using zktls-core-sdk
+ * @module @veritas/neat
  */
 
-import { ethers, Signer, Contract, BytesLike } from 'ethers';
-import { ZKTLS } from '@primus-labs/zktls-core-sdk';
+import { ethers, Signer, Contract } from 'ethers';
+import { PrimusZKTLS } from '@primus-labs/zktls-core-sdk';
 
 /**
- * Configuration for Veritas SDK
+ * Configuration for Neat Veritas SDK
  */
-export interface VeritasConfig {
+export interface NeatVeritasConfig {
   /** Signer for transaction signing */
   signer: Signer;
   /** zktls-core-sdk configuration */
-  zktlsConfig?: {
-    /** Custom zktls endpoint (optional) */
+  primusConfig?: {
+    /** Primus App ID */
+    appId: string;
+    /** Primus App Secret */
+    appSecret: string;
+    /** Custom endpoint (optional) */
     endpoint?: string;
-    /** Debug mode */
-    debug?: boolean;
   };
 }
 
@@ -37,11 +39,23 @@ export interface APIRequest {
 }
 
 /**
+ * Response resolve structure (for parsePath)
+ */
+export interface ResponseResolve {
+  /** Key name to extract */
+  keyName: string;
+  /** Parse type (JSON, HTML, XML, TEXT) */
+  parseType: 'JSON' | 'HTML' | 'XML' | 'TEXT';
+  /** JSONPath or XPath to extract value */
+  parsePath: string;
+}
+
+/**
  * Attestation result structure
  */
-export interface AttestationResult {
-  /** The attestation proof */
-  attestation: string;
+export interface NeatAttestationResult {
+  /** The attestation object */
+  attestation: any;  // Attestation struct from Primus
   /** The response data */
   responseData: any;
   /** Signature */
@@ -55,7 +69,7 @@ export interface AttestationResult {
 /**
  * Validation result structure
  */
-export interface ValidationResult {
+export interface NeatValidationResult {
   /** Whether validation passed */
   passed: boolean;
   /** Rule ID used */
@@ -64,121 +78,110 @@ export interface ValidationResult {
   timestamp: number;
   /** Attestation hash */
   attestationHash: string;
+  /** Attestation recipient */
+  recipient: string;
 }
 
 /**
- * Veritas SDK class
- * @description Main class for interacting with Veritas Protocol
+ * NeatVeritasSDK class
+ * @description Main class for interacting with Neat Veritas Protocol
  */
-export class VeritasSDK {
-  private zktls: ZKTLS;
+export class NeatVeritasSDK {
+  private primus: PrimusZKTLS;
   private signer: Signer;
+  private config: NeatVeritasConfig;
 
   /**
-   * Create a new Veritas SDK instance
+   * Create a new Neat Veritas SDK instance
    * @param config Configuration options
    */
-  constructor(config: VeritasConfig) {
+  constructor(config: NeatVeritasConfig) {
+    this.config = config;
     this.signer = config.signer;
     
-    // Initialize zktls-core-sdk
-    this.zktls = new ZKTLS({
-      endpoint: config.zktlsConfig?.endpoint,
-      debug: config.zktlsConfig?.debug || false,
+    // Initialize Primus ZKTLS
+    this.primus = new PrimusZKTLS({
+      appId: config.primusConfig?.appId,
+      appSecret: config.primusConfig?.appSecret,
+      endpoint: config.primusConfig?.endpoint,
     });
   }
 
   /**
-   * Execute an API call and generate an attestation
+   * Initialize the SDK
+   */
+  async init(): Promise<void> {
+    if (this.config.primusConfig) {
+      await this.primus.init(
+        this.config.primusConfig.appId,
+        this.config.primusConfig.appSecret
+      );
+    }
+  }
+
+  /**
+   * Generate an attestation for an API call
    * @param request API request configuration
+   * @param responseResolves Response extraction configuration
    * @returns Attestation result
    */
-  async executeWithProof(request: APIRequest): Promise<AttestationResult> {
+  async attest(
+    request: APIRequest,
+    responseResolves?: ResponseResolve[]
+  ): Promise<NeatAttestationResult> {
     try {
-      // 1. Execute API call
-      const response = await fetch(request.url, {
-        method: request.method,
-        headers: request.headers,
-        body: request.body ? JSON.stringify(request.body) : undefined,
-      });
-
-      const responseData = await response.json();
-
-      // 2. Generate attestation using zktls-core-sdk
-      const attestation = await this.zktls.generateAttestation({
+      // Prepare attestation request
+      const attestRequest = {
+        recipient: await this.signer.getAddress(),
         request: {
           url: request.url,
           method: request.method,
           headers: request.headers || {},
           body: request.body ? JSON.stringify(request.body) : '',
         },
-        response: {
-          status: response.status,
-          statusText: response.statusText,
-          headers: Object.fromEntries(response.headers.entries()),
-          body: JSON.stringify(responseData),
-        },
-        signer: this.signer,
-      });
+        responseResolves: responseResolves || [],
+      };
 
-      // 3. Calculate attestation hash
+      // Generate attestation with Primus
+      const attestation = await this.primus.startAttestation(attestRequest);
+
+      // Calculate attestation hash
       const attestationHash = ethers.keccak256(
-        ethers.toUtf8Bytes(attestation.proof)
+        ethers.toUtf8Bytes(JSON.stringify(attestation))
       );
 
-      // 4. Return result
       return {
-        attestation: attestation.proof,
-        responseData: responseData,
-        signature: attestation.signature,
-        timestamp: Math.floor(Date.now() / 1000),
+        attestation: attestation,
+        responseData: attestation.data,
+        signature: attestation.signatures?.[0] || '',
+        timestamp: attestation.timestamp || Math.floor(Date.now() / 1000),
         attestationHash: attestationHash,
       };
     } catch (error) {
-      throw new Error(`Failed to execute with proof: ${error}`);
-    }
-  }
-
-  /**
-   * Verify an attestation locally
-   * @param attestation Attestation to verify
-   * @returns Whether attestation is valid
-   */
-  async verifyAttestation(attestation: string): Promise<boolean> {
-    try {
-      return await this.zktls.verifyAttestation(attestation);
-    } catch (error) {
-      throw new Error(`Failed to verify attestation: ${error}`);
+      throw new Error(`Failed to generate attestation: ${error}`);
     }
   }
 
   /**
    * Submit attestation to validator for on-chain validation
    * @param validatorAddress Address of the VeritasValidator contract
-   * @param attestation The attestation data
+   * @param attestation The attestation object
    * @param ruleId Rule ID to validate against
-   * @param responseData Response data
    * @returns Validation result from blockchain
    */
   async validateAttestation(
     validatorAddress: string,
-    attestation: string,
-    ruleId: number,
-    responseData: any
-  ): Promise<ValidationResult> {
+    attestation: any,
+    ruleId: number
+  ): Promise<NeatValidationResult> {
     
     const validatorAbi = [
-      'function validate(bytes calldata attestation, uint256 ruleId, bytes calldata responseData) external returns (bool passed, bytes32 attestationHash)',
+      'function validate(tuple(address recipient, tuple(string url, string header, string method, string body) request, tuple(string keyName, string parseType, string parsePath)[] reponseResolve, string data, string attConditions, uint64 timestamp, string additionParams, tuple(address attestorAddr, string url)[] attestors, bytes[] signatures) attestation, uint256 ruleId) external returns (bool passed, bytes32 attestationHash)',
     ];
 
     const validator = new Contract(validatorAddress, validatorAbi, this.signer);
 
-    const tx = await validator.validate(
-      ethers.toUtf8Bytes(attestation),
-      ruleId,
-      ethers.toUtf8Bytes(JSON.stringify(responseData))
-    );
-
+    const tx = await validator.validate(attestation, ruleId);
     const receipt = await tx.wait();
 
     // Parse event to get result
@@ -198,6 +201,7 @@ export class VeritasSDK {
         ruleId: Number(parsed.args.ruleId),
         timestamp: Math.floor(Date.now() / 1000),
         attestationHash: parsed.args.attestationHash,
+        recipient: parsed.args.recipient,
       };
     }
 
@@ -213,10 +217,10 @@ export class VeritasSDK {
   async getValidationResult(
     validatorAddress: string,
     attestationHash: string
-  ): Promise<ValidationResult> {
+  ): Promise<NeatValidationResult> {
     
     const validatorAbi = [
-      'function getValidationResult(bytes32 attestationHash) external view returns (uint256 ruleId, bool passed, uint256 timestamp)',
+      'function getValidationResult(bytes32 attestationHash) external view returns (uint256 ruleId, bool passed, uint256 timestamp, address recipient, address validator)',
     ];
 
     const validator = new Contract(validatorAddress, validatorAbi, this.signer);
@@ -228,6 +232,7 @@ export class VeritasSDK {
       passed: result.passed,
       timestamp: Number(result.timestamp),
       attestationHash: attestationHash,
+      recipient: result.recipient,
     };
   }
 
@@ -254,3 +259,6 @@ export class VeritasSDK {
 
 // Export types
 export * from './types';
+
+// Default export
+export default NeatVeritasSDK;

@@ -1,8 +1,14 @@
-# Veritas Protocol - Binary Verification Layer
+# Veritas Neat - Binary Verification Layer
+
+**The Neat Version of Veritas Protocol**
 
 **Cryptographic Verification for AI Agent Commerce**
 
-A minimal verification protocol using zktls-core-sdk for direct TLS attestations.
+A minimal, simplified verification protocol using zktls-core-sdk for direct TLS attestations.
+
+> **"Neat"** = Simple, Clean, Focused
+> 
+> This is the simplified version of Veritas Protocol, stripped down to the essentials.
 
 ## 🎯 What is Veritas?
 
@@ -172,22 +178,34 @@ npx hardhat run scripts/deploy.ts --network baseSepolia
 ### SDK
 
 ```typescript
-import { VeritasSDK } from '@veritas/sdk';
+import { NeatVeritasSDK } from '@veritas/neat';
 
-const veritas = new VeritasSDK({ signer: wallet });
-
-// Generate proof
-const result = await veritas.executeWithProof({
-  url: 'https://api.example.com/data',
-  method: 'GET'
+const neatVeritas = new NeatVeritasSDK({ 
+  signer: wallet,
+  primusConfig: {
+    appId: 'your-primus-app-id',
+    appSecret: 'your-primus-app-secret'
+  }
 });
 
-// Verify on-chain
-const validation = await veritas.validateAttestation(
+// Initialize
+await neatVeritas.init();
+
+// Generate attestation
+const result = await neatVeritas.attest({
+  url: 'https://api.example.com/data',
+  method: 'GET'
+}, [{
+  keyName: 'data',
+  parseType: 'JSON',
+  parsePath: '$.data'
+}]);
+
+// Validate on-chain
+const validation = await neatVeritas.validateAttestation(
   validatorAddress,
   result.attestation,
-  ruleId,
-  result.responseData
+  ruleId
 );
 
 console.log(validation.passed); // true or false

@@ -1,7 +1,7 @@
 {
-  "name": "@veritas/protocol",
-  "version": "1.0.0",
-  "description": "Simplified Veritas Protocol - Verification layer for AI Agent commerce",
+  "name": "@veritas/neat",
+  "version": "2.1.0",
+  "description": "Neat Veritas Protocol - Minimal verification layer for AI Agent commerce",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -14,6 +14,7 @@
   },
   "keywords": [
     "veritas",
+    "neat",
     "verification",
     "zktls",
     "attestation",
