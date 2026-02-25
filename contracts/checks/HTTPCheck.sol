@@ -26,26 +26,18 @@ contract HTTPCheck is ICheck {
         uint256 timestamp;
     }
     
-    // Events
-    event CheckPerformed(
-        bytes32 indexed attestationHash,
-        bool passed,
-        uint256 score
-    );
-    
     /**
      * @notice Validate an HTTP attestation
      * @param attestation The attestation data from zktls-core-sdk
      * @param checkData Encoded HTTPCheckData
      * @param responseData The response data
-     * @return passed Whether validation passed
-     * @return score The validation score (0-100)
+     * @return passed Whether validation passed (true/false)
      */
     function validate(
         bytes calldata attestation,
         bytes calldata checkData,
         bytes calldata responseData
-    ) external pure override returns (bool passed, uint256 score) {
+    ) external pure override returns (bool passed) {
         
         // Parse check data
         HTTPCheckData memory data = abi.decode(checkData, (HTTPCheckData));
@@ -53,38 +45,31 @@ contract HTTPCheck is ICheck {
         // Parse attestation
         ParsedAttestation memory parsed = parseAttestation(attestation);
         
-        // Initialize score
-        score = 100;
-        passed = true;
-        
         // Validate URL
         if (!_matchUrl(parsed.url, data.expectedUrl)) {
-            return (false, 0);
+            return false;
         }
         
         // Validate method
         if (!_matchMethod(parsed.method, data.expectedMethod)) {
-            return (false, 0);
+            return false;
         }
         
         // Validate response code
         if (parsed.responseCode < data.minResponseCode || 
             parsed.responseCode > data.maxResponseCode) {
-            return (false, 0);
+            return false;
         }
         
         // Validate response pattern (if specified)
         if (data.expectedResponsePattern.length > 0) {
             if (!_matchPattern(responseData, data.expectedResponsePattern)) {
-                passed = false;
-                score = 50;
+                return false;
             }
         }
         
-        // Calculate final score based on response quality
-        score = _calculateScore(parsed.responseCode, responseData.length);
-        
-        return (passed, score);
+        // All checks passed
+        return true;
     }
     
     /**
@@ -151,14 +136,14 @@ contract HTTPCheck is ICheck {
             
             // Check if URL starts with prefix
             if (urlBytes.length >= prefix.length) {
-                bool isMatch = true;
+                bool match = true;
                 for (uint i = 0; i < prefix.length; i++) {
                     if (urlBytes[i] != prefix[i]) {
-                        isMatch = false;
+                        match = false;
                         break;
                     }
                 }
-                return isMatch;
+                return match;
             }
         }
         
@@ -233,39 +218,6 @@ contract HTTPCheck is ICheck {
     }
     
     /**
-     * @notice Calculate validation score
-     * @param responseCode HTTP response code
-     * @param responseLength Response length
-     * @return Score (0-100)
-     */
-    function _calculateScore(
-        uint256 responseCode, 
-        uint256 responseLength
-    ) internal pure returns (uint256) {
-        uint256 score = 100;
-        
-        // Deduct points for non-2xx responses
-        if (responseCode >= 200 && responseCode < 300) {
-            score = 100;
-        } else if (responseCode >= 300 && responseCode < 400) {
-            score = 80;
-        } else if (responseCode >= 400 && responseCode < 500) {
-            score = 50;
-        } else if (responseCode >= 500) {
-            score = 20;
-        }
-        
-        // Bonus for substantial response
-        if (responseLength > 0 && responseLength < 1000) {
-            score = score;  // Keep score
-        } else if (responseLength >= 1000) {
-            score = min(score + 5, 100);  // Bonus, max 100
-        }
-        
-        return score;
-    }
-    
-    /**
      * @notice Convert byte to uppercase
      */
     function _toUpper(bytes1 b) internal pure returns (bytes1) {
@@ -273,12 +225,5 @@ contract HTTPCheck is ICheck {
             return bytes1(uint8(b) - 32);
         }
         return b;
-    }
-    
-    /**
-     * @notice Minimum of two numbers
-     */
-    function min(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a < b ? a : b;
     }
 }

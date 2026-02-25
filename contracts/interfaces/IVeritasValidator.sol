@@ -9,39 +9,35 @@ pragma solidity ^0.8.0;
 interface IVeritasValidator {
     /**
      * @notice Validate an attestation against a rule
-     * @param jobId The job identifier
-     * @param ruleId The rule identifier
      * @param attestation The attestation data
+     * @param ruleId The rule identifier
      * @param responseData The response data
-     * @return passed Whether validation passed
-     * @return score The validation score
+     * @return passed Whether validation passed (true/false)
+     * @return attestationHash The hash of the attestation
      */
     function validate(
-        bytes32 jobId,
-        uint256 ruleId,
         bytes calldata attestation,
+        uint256 ruleId,
         bytes calldata responseData
-    ) external returns (bool passed, uint256 score);
+    ) external returns (bool passed, bytes32 attestationHash);
     
     /**
-     * @notice Get validation result for a job
-     * @param jobId The job identifier
+     * @notice Get validation result by attestation hash
+     * @param attestationHash The hash of the attestation
      * @return ruleId The rule used
      * @return passed Whether validation passed
-     * @return score The validation score
      * @return timestamp When validation was performed
      */
-    function getValidationResult(bytes32 jobId) external view returns (
+    function getValidationResult(bytes32 attestationHash) external view returns (
         uint256 ruleId,
         bool passed,
-        uint256 score,
         uint256 timestamp
     );
     
     /**
-     * @notice Check if a job has been validated
-     * @param jobId The job identifier
-     * @return Whether the job has been validated
+     * @notice Check if an attestation has been validated
+     * @param attestationHash The hash of the attestation
+     * @return Whether the attestation has been validated
      */
-    function isValidated(bytes32 jobId) external view returns (bool);
+    function isValidated(bytes32 attestationHash) external view returns (bool);
 }

@@ -1,12 +1,12 @@
 /**
  * @fileoverview Deployment script for Veritas Protocol
- * @description Deploys verification contracts only (no escrow)
+ * @description Deploys verification contracts only - binary validation (no score)
  */
 
 import { ethers } from 'hardhat';
 
 async function main() {
-  console.log('Deploying Veritas Protocol - Verification Layer...\n');
+  console.log('Deploying Veritas Protocol - Binary Verification...\n');
 
   const [deployer] = await ethers.getSigners();
   console.log('Deployer:', deployer.address);
@@ -36,7 +36,7 @@ async function main() {
   const validatorAddress = await validator.getAddress();
   console.log('   VeritasValidator:', validatorAddress);
 
-  // 4. Create sample rule
+  // 4. Create sample rule (no score requirement)
   console.log('\n4. Creating sample verification rule...');
   const checkData = ethers.AbiCoder.defaultAbiCoder().encode(
     ['string', 'string', 'uint256', 'uint256', 'bytes'],
@@ -47,8 +47,7 @@ async function main() {
     'Example API Verification',
     'Verify API calls to example.com',
     httpCheckAddress,
-    checkData,
-    80 // required score
+    checkData
   );
   await createRuleTx.wait();
   console.log('   Sample rule created (ID: 1)');
@@ -69,7 +68,7 @@ async function main() {
   console.log('ID:              1');
   console.log('Name:            Example API Verification');
   console.log('Check Contract:  HTTPCheck');
-  console.log('Required Score:  80');
+  console.log('Validation:      Binary (passed/failed)');
 
   // 6. Save deployment info
   const deploymentInfo = {
@@ -90,7 +89,7 @@ async function main() {
   console.log('1. Create more rules using RuleRegistry.createRule()');
   console.log('2. Use VeritasSDK to generate proofs');
   console.log('3. Validate proofs using VeritasValidator.validate()');
-  console.log('4. Integrate with ACP for commercial logic');
+  console.log('4. Result: passed (true/false) - no score');
 }
 
 main()

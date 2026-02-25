@@ -14,7 +14,6 @@ contract RuleRegistry {
         string description;
         address checkContract;    // Address of the check contract
         bytes checkData;          // Custom data for the check
-        uint256 requiredScore;    // Minimum score required (0-100)
         bool active;
         address creator;
         uint256 createdAt;
@@ -36,8 +35,7 @@ contract RuleRegistry {
     event RuleCreated(
         uint256 indexed ruleId,
         string name,
-        address indexed checkContract,
-        uint256 requiredScore
+        address indexed checkContract
     );
     
     event RuleUpdated(
@@ -97,18 +95,15 @@ contract RuleRegistry {
      * @param _description Rule description
      * @param _checkContract Address of the check contract
      * @param _checkData Custom data for the check
-     * @param _requiredScore Minimum score required (0-100)
      * @return ruleId The ID of the created rule
      */
     function createRule(
         string calldata _name,
         string calldata _description,
         address _checkContract,
-        bytes calldata _checkData,
-        uint256 _requiredScore
+        bytes calldata _checkData
     ) external onlyAdmin returns (uint256) {
         require(_checkContract != address(0), "Veritas: invalid check contract");
-        require(_requiredScore <= 100, "Veritas: score > 100");
         require(bytes(_name).length > 0, "Veritas: empty name");
         
         uint256 ruleId = nextRuleId++;
@@ -119,7 +114,6 @@ contract RuleRegistry {
             description: _description,
             checkContract: _checkContract,
             checkData: _checkData,
-            requiredScore: _requiredScore,
             active: true,
             creator: msg.sender,
             createdAt: block.timestamp
@@ -127,7 +121,7 @@ contract RuleRegistry {
         
         ruleIds.push(ruleId);
         
-        emit RuleCreated(ruleId, _name, _checkContract, _requiredScore);
+        emit RuleCreated(ruleId, _name, _checkContract);
         
         return ruleId;
     }

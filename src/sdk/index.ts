@@ -58,8 +58,6 @@ export interface AttestationResult {
 export interface ValidationResult {
   /** Whether validation passed */
   passed: boolean;
-  /** Validation score (0-100) */
-  score: number;
   /** Rule ID used */
   ruleId: number;
   /** Validation timestamp */
@@ -170,7 +168,7 @@ export class VeritasSDK {
   ): Promise<ValidationResult> {
     
     const validatorAbi = [
-      'function validate(bytes calldata attestation, uint256 ruleId, bytes calldata responseData) external returns (bool passed, uint256 score, bytes32 attestationHash)',
+      'function validate(bytes calldata attestation, uint256 ruleId, bytes calldata responseData) external returns (bool passed, bytes32 attestationHash)',
     ];
 
     const validator = new Contract(validatorAddress, validatorAbi, this.signer);
@@ -197,7 +195,6 @@ export class VeritasSDK {
       const parsed = validator.interface.parseLog(event);
       return {
         passed: parsed.args.passed,
-        score: Number(parsed.args.score),
         ruleId: Number(parsed.args.ruleId),
         timestamp: Math.floor(Date.now() / 1000),
         attestationHash: parsed.args.attestationHash,
@@ -219,7 +216,7 @@ export class VeritasSDK {
   ): Promise<ValidationResult> {
     
     const validatorAbi = [
-      'function getValidationResult(bytes32 attestationHash) external view returns (uint256 ruleId, bool passed, uint256 score, uint256 timestamp)',
+      'function getValidationResult(bytes32 attestationHash) external view returns (uint256 ruleId, bool passed, uint256 timestamp)',
     ];
 
     const validator = new Contract(validatorAddress, validatorAbi, this.signer);
@@ -229,7 +226,6 @@ export class VeritasSDK {
     return {
       ruleId: Number(result.ruleId),
       passed: result.passed,
-      score: Number(result.score),
       timestamp: Number(result.timestamp),
       attestationHash: attestationHash,
     };

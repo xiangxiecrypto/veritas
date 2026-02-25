@@ -7,7 +7,7 @@ import "./RuleRegistry.sol";
 /**
  * @title VeritasValidator
  * @notice Core validation contract for zktls-core-sdk attestations
- * @dev Validates attestations without any business logic (no jobs, no escrow)
+ * @dev Validates attestations - returns only passed/failed (no score)
  */
 contract VeritasValidator {
     
@@ -16,7 +16,6 @@ contract VeritasValidator {
     struct ValidationResult {
         uint256 ruleId;
         bool passed;
-        uint256 score;
         uint256 timestamp;
         address validator;
         bytes32 attestationHash;
@@ -30,7 +29,6 @@ contract VeritasValidator {
         bytes32 indexed attestationHash,
         uint256 indexed ruleId,
         bool passed,
-        uint256 score,
         address validator
     );
     
@@ -53,15 +51,14 @@ contract VeritasValidator {
      * @param attestation The attestation data from zktls-core-sdk
      * @param ruleId The rule identifier
      * @param responseData The response data to validate
-     * @return passed Whether validation passed
-     * @return score The validation score (0-100)
+     * @return passed Whether validation passed (true/false)
      * @return attestationHash The hash of the attestation for reference
      */
     function validate(
         bytes calldata attestation,
         uint256 ruleId,
         bytes calldata responseData
-    ) external returns (bool passed, uint256 score, bytes32 attestationHash) {
+    ) external returns (bool passed, bytes32 attestationHash) {
         
         // Calculate attestation hash
         attestationHash = keccak256(attestation);
@@ -84,30 +81,24 @@ contract VeritasValidator {
         
         // Call the check contract
         ICheck check = ICheck(rule.checkContract);
-        (passed, score) = check.validate(
+        passed = check.validate(
             attestation,
             rule.checkData,
             responseData
         );
         
-        // Check if score meets requirement
-        if (score < rule.requiredScore) {
-            passed = false;
-        }
-        
         // Store the result
         results[attestationHash] = ValidationResult({
             ruleId: ruleId,
             passed: passed,
-            score: score,
             timestamp: block.timestamp,
             validator: msg.sender,
             attestationHash: attestationHash
         });
         
-        emit ValidationPerformed(attestationHash, ruleId, passed, score, msg.sender);
+        emit ValidationPerformed(attestationHash, ruleId, passed, msg.sender);
         
-        return (passed, score, attestationHash);
+        return (passed, attestationHash);
     }
     
     /**
@@ -115,20 +106,17 @@ contract VeritasValidator {
      * @param attestationHash The hash of the attestation
      * @return ruleId The rule used
      * @return passed Whether validation passed
-     * @return score The validation score
      * @return timestamp When validation was performed
      */
     function getValidationResult(bytes32 attestationHash) external view returns (
         uint256 ruleId,
         bool passed,
-        uint256 score,
         uint256 timestamp
     ) {
         ValidationResult memory result = results[attestationHash];
         return (
             result.ruleId,
             result.passed,
-            result.score,
             result.timestamp
         );
     }

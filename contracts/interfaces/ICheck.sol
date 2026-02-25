@@ -12,12 +12,11 @@ interface ICheck {
      * @param attestation The attestation data from zktls-core-sdk
      * @param checkData Custom data for this check
      * @param responseData The response data from API call
-     * @return passed Whether validation passed
-     * @return score The validation score (0-100)
+     * @return passed Whether validation passed (true/false)
      */
     function validate(
         bytes calldata attestation,
         bytes calldata checkData,
         bytes calldata responseData
-    ) external view returns (bool passed, uint256 score);
+    ) external view returns (bool passed);
 }

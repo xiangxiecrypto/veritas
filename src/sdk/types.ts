@@ -12,7 +12,6 @@ export interface Rule {
   description: string;
   checkContract: string;
   checkData: string;
-  requiredScore: bigint;
   active: boolean;
   creator: string;
   createdAt: bigint;
@@ -35,7 +34,6 @@ export interface HTTPCheckData {
 export interface OnChainValidationResult {
   ruleId: bigint;
   passed: boolean;
-  score: bigint;
   timestamp: bigint;
 }
 

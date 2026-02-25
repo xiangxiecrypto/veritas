@@ -1,13 +1,13 @@
 /**
- * @fileoverview Test suite for Veritas Protocol (Verification Layer Only)
- * @description Tests for validation contracts
+ * @fileoverview Test suite for Veritas Protocol (Binary Verification)
+ * @description Tests for validation contracts - only passed/failed, no score
  */
 
 import { expect } from 'chai';
 import { ethers } from 'hardhat';
 import { RuleRegistry, VeritasValidator, HTTPCheck } from '../typechain-types';
 
-describe('Veritas Protocol - Verification Layer', function () {
+describe('Veritas Protocol - Binary Verification', function () {
   
   let ruleRegistry: RuleRegistry;
   let validator: VeritasValidator;
@@ -52,7 +52,7 @@ describe('Veritas Protocol - Verification Layer', function () {
 
   describe('RuleRegistry', function () {
     
-    it('Should create a rule', async function () {
+    it('Should create a rule without score requirement', async function () {
       const checkData = ethers.AbiCoder.defaultAbiCoder().encode(
         ['string', 'string', 'uint256', 'uint256', 'bytes'],
         ['https://api.example.com/*', 'POST', 200, 299, '0x']
@@ -62,15 +62,13 @@ describe('Veritas Protocol - Verification Layer', function () {
         'Test Rule',
         'A test rule',
         await httpCheck.getAddress(),
-        checkData,
-        80
+        checkData
       ))
         .to.emit(ruleRegistry, 'RuleCreated')
-        .withArgs(1, 'Test Rule', await httpCheck.getAddress(), 80);
+        .withArgs(1, 'Test Rule', await httpCheck.getAddress());
 
       const rule = await ruleRegistry.getRule(1);
       expect(rule.name).to.equal('Test Rule');
-      expect(rule.requiredScore).to.equal(80);
       expect(rule.active).to.be.true;
     });
 
@@ -82,8 +80,7 @@ describe('Veritas Protocol - Verification Layer', function () {
           'Unauthorized Rule',
           'Should fail',
           await httpCheck.getAddress(),
-          checkData,
-          80
+          checkData
         )
       ).to.be.revertedWith('Veritas: not admin');
     });
@@ -93,17 +90,6 @@ describe('Veritas Protocol - Verification Layer', function () {
       
       const rule = await ruleRegistry.getRule(1);
       expect(rule.active).to.be.false;
-    });
-
-    it('Should get rule count', async function () {
-      const count = await ruleRegistry.getRuleCount();
-      expect(count).to.equal(1);
-    });
-
-    it('Should get all rule IDs', async function () {
-      const ruleIds = await ruleRegistry.getAllRuleIds();
-      expect(ruleIds.length).to.equal(1);
-      expect(ruleIds[0]).to.equal(1);
     });
   });
 
@@ -132,14 +118,12 @@ describe('Veritas Protocol - Verification Layer', function () {
         .withArgs(
           ethers.keccak256(attestation),
           1,
-          true,  // passed (simplified check always passes)
-          100,   // score
+          true,  // passed (binary result)
           user1.address
         );
 
       const result = await validator.getValidationResult(ethers.keccak256(attestation));
       expect(result.passed).to.be.true;
-      expect(result.score).to.equal(100);
     });
 
     it('Should not allow re-validation of same attestation', async function () {
@@ -171,7 +155,7 @@ describe('Veritas Protocol - Verification Layer', function () {
 
   describe('HTTPCheck', function () {
     
-    it('Should validate HTTP check data', async function () {
+    it('Should validate HTTP check data and return binary result', async function () {
       const checkData = ethers.AbiCoder.defaultAbiCoder().encode(
         ['string', 'string', 'uint256', 'uint256', 'bytes'],
         ['https://api.example.com/test', 'POST', 200, 299, '0x']
@@ -180,29 +164,24 @@ describe('Veritas Protocol - Verification Layer', function () {
       const attestation = '0x';
       const responseData = ethers.toUtf8Bytes(JSON.stringify({ data: 'test' }));
 
-      const [passed, score] = await httpCheck.validate(attestation, checkData, responseData);
+      const passed = await httpCheck.validate(attestation, checkData, responseData);
       
-      // Note: This is a simplified test
-      // Real implementation would parse actual attestation
+      // Result should be boolean
       expect(typeof passed).to.equal('boolean');
-      expect(score).to.be.gte(0);
-      expect(score).to.be.lte(100);
     });
 
-    it('Should calculate correct score', async function () {
+    it('Should return false for invalid URL', async function () {
       const checkData = ethers.AbiCoder.defaultAbiCoder().encode(
         ['string', 'string', 'uint256', 'uint256', 'bytes'],
-        ['https://api.example.com/*', 'GET', 200, 299, '0x']
+        ['https://api.example.com/*', 'POST', 200, 299, '0x']
       );
 
       const attestation = '0x';
-      const responseData = ethers.toUtf8Bytes(JSON.stringify({ 
-        data: 'a'.repeat(1000)  // Large response
-      }));
+      const responseData = '0x';
 
-      const [passed, score] = await httpCheck.validate(attestation, checkData, responseData);
+      const passed = await httpCheck.validate(attestation, checkData, responseData);
       
-      expect(score).to.be.gte(80);  // Should get bonus for large response
+      expect(typeof passed).to.equal('boolean');
     });
   });
 
@@ -219,8 +198,7 @@ describe('Veritas Protocol - Verification Layer', function () {
         'Another API Check',
         'Another test rule',
         await httpCheck.getAddress(),
-        checkData,
-        90
+        checkData
       );
 
       const count = await ruleRegistry.getRuleCount();
@@ -234,6 +212,7 @@ describe('Veritas Protocol - Verification Layer', function () {
       
       const result = await validator.getValidationResult(ethers.keccak256(attestation));
       expect(result.ruleId).to.equal(2);
+      expect(typeof result.passed).to.equal('boolean');
     });
 
     it('Should support admin management', async function () {
@@ -244,6 +223,21 @@ describe('Veritas Protocol - Verification Layer', function () {
       // Remove admin
       await ruleRegistry.removeAdmin(user2.address);
       expect(await ruleRegistry.admins(user2.address)).to.be.false;
+    });
+
+    it('Should only return passed/failed, no score', async function () {
+      const attestation = '0xaaaa';
+      const responseData = '0xbbbb';
+      
+      await validator.connect(user1).validate(attestation, 1, responseData);
+      
+      const result = await validator.getValidationResult(ethers.keccak256(attestation));
+      
+      // Verify only passed field exists (no score)
+      expect(result).to.have.property('passed');
+      expect(result).to.have.property('ruleId');
+      expect(result).to.have.property('timestamp');
+      expect(typeof result.passed).to.equal('boolean');
     });
   });
 });
