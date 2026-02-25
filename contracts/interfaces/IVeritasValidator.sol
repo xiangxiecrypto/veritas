@@ -8,7 +8,7 @@ pragma solidity ^0.8.0;
  */
 interface IVeritasValidator {
     /**
-     * @notice Validate an attestation for a job
+     * @notice Validate an attestation against a rule
      * @param jobId The job identifier
      * @param ruleId The rule identifier
      * @param attestation The attestation data
@@ -37,4 +37,11 @@ interface IVeritasValidator {
         uint256 score,
         uint256 timestamp
     );
+    
+    /**
+     * @notice Check if a job has been validated
+     * @param jobId The job identifier
+     * @return Whether the job has been validated
+     */
+    function isValidated(bytes32 jobId) external view returns (bool);
 }

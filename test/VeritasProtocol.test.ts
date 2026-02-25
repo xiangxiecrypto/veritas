@@ -1,26 +1,24 @@
 /**
- * @fileoverview Test suite for Veritas Protocol
- * @description Tests for all core contracts
+ * @fileoverview Test suite for Veritas Protocol (Verification Layer Only)
+ * @description Tests for validation contracts
  */
 
 import { expect } from 'chai';
 import { ethers } from 'hardhat';
-import { RuleRegistry, VeritasValidator, HTTPCheck, EnhancedEscrow } from '../typechain-types';
+import { RuleRegistry, VeritasValidator, HTTPCheck } from '../typechain-types';
 
-describe('Veritas Protocol', function () {
+describe('Veritas Protocol - Verification Layer', function () {
   
   let ruleRegistry: RuleRegistry;
   let validator: VeritasValidator;
   let httpCheck: HTTPCheck;
-  let escrow: EnhancedEscrow;
   
   let owner: any;
-  let buyer: any;
-  let seller: any;
-  let other: any;
+  let user1: any;
+  let user2: any;
 
   before(async function () {
-    [owner, buyer, seller, other] = await ethers.getSigners();
+    [owner, user1, user2] = await ethers.getSigners();
   });
 
   describe('Deployment', function () {
@@ -49,15 +47,6 @@ describe('Veritas Protocol', function () {
       
       expect(await validator.getAddress()).to.be.properAddress;
       expect(await validator.ruleRegistry()).to.equal(await ruleRegistry.getAddress());
-    });
-
-    it('Should deploy EnhancedEscrow', async function () {
-      const EscrowFactory = await ethers.getContractFactory('EnhancedEscrow');
-      escrow = await EscrowFactory.deploy(await validator.getAddress());
-      await escrow.waitForDeployment();
-      
-      expect(await escrow.getAddress()).to.be.properAddress;
-      expect(await escrow.validator()).to.equal(await validator.getAddress());
     });
   });
 
@@ -89,7 +78,7 @@ describe('Veritas Protocol', function () {
       const checkData = '0x';
       
       await expect(
-        ruleRegistry.connect(other).createRule(
+        ruleRegistry.connect(user1).createRule(
           'Unauthorized Rule',
           'Should fail',
           await httpCheck.getAddress(),
@@ -105,77 +94,78 @@ describe('Veritas Protocol', function () {
       const rule = await ruleRegistry.getRule(1);
       expect(rule.active).to.be.false;
     });
+
+    it('Should get rule count', async function () {
+      const count = await ruleRegistry.getRuleCount();
+      expect(count).to.equal(1);
+    });
+
+    it('Should get all rule IDs', async function () {
+      const ruleIds = await ruleRegistry.getAllRuleIds();
+      expect(ruleIds.length).to.equal(1);
+      expect(ruleIds[0]).to.equal(1);
+    });
   });
 
-  describe('EnhancedEscrow', function () {
+  describe('VeritasValidator', function () {
     
-    const jobId = ethers.encodeBytes32String('test-job-1');
-    const amount = ethers.parseEther('0.01');
-
-    it('Should create a job without verification', async function () {
+    it('Should fail validation for inactive rule', async function () {
+      const attestation = '0x1234';
+      const responseData = '0x5678';
+      
       await expect(
-        escrow.connect(buyer).createJob(
-          jobId,
-          seller.address,
-          amount,
-          false,  // no verification
-          0,      // no rule
-          { value: amount }
-        )
-      )
-        .to.emit(escrow, 'JobCreated')
-        .withArgs(jobId, buyer.address, seller.address, amount, false, 0);
-
-      const job = await escrow.getJob(jobId);
-      expect(job.buyer).to.equal(buyer.address);
-      expect(job.seller).to.equal(seller.address);
-      expect(job.amount).to.equal(amount);
-      expect(job.verificationRequired).to.be.false;
+        validator.connect(user1).validate(attestation, 1, responseData)
+      ).to.be.revertedWithCustomError(validator, 'RuleNotActive');
     });
 
-    it('Should not create duplicate job', async function () {
-      await expect(
-        escrow.connect(buyer).createJob(
-          jobId,
-          seller.address,
-          amount,
-          false,
-          0,
-          { value: amount }
-        )
-      ).to.be.revertedWithCustomError(escrow, 'JobAlreadyExists');
-    });
-
-    it('Should allow seller to accept job', async function () {
-      await expect(escrow.connect(seller).acceptJob(jobId))
-        .to.emit(escrow, 'JobAccepted')
-        .withArgs(jobId, seller.address);
-
-      const job = await escrow.getJob(jobId);
-      expect(job.status).to.equal(1);  // InProgress
-    });
-
-    it('Should allow seller to complete job without verification', async function () {
-      const attestation = '0x';
+    it('Should activate rule and validate', async function () {
+      // Activate rule
+      await ruleRegistry.updateRuleStatus(1, true);
+      
+      const attestation = '0x1234';
       const responseData = ethers.toUtf8Bytes(JSON.stringify({ result: 'success' }));
 
-      await expect(
-        escrow.connect(seller).completeJob(jobId, attestation, responseData)
-      )
-        .to.emit(escrow, 'JobCompleted')
-        .withArgs(jobId, false, 0);
+      const tx = await validator.connect(user1).validate(attestation, 1, responseData);
+      
+      await expect(tx)
+        .to.emit(validator, 'ValidationPerformed')
+        .withArgs(
+          ethers.keccak256(attestation),
+          1,
+          true,  // passed (simplified check always passes)
+          100,   // score
+          user1.address
+        );
 
-      const job = await escrow.getJob(jobId);
-      expect(job.status).to.equal(2);  // Completed
+      const result = await validator.getValidationResult(ethers.keccak256(attestation));
+      expect(result.passed).to.be.true;
+      expect(result.score).to.equal(100);
     });
 
-    it('Should allow buyer to confirm job', async function () {
-      await expect(escrow.connect(buyer).confirmJob(jobId))
-        .to.emit(escrow, 'PaymentReleased')
-        .withArgs(jobId, seller.address, amount);
+    it('Should not allow re-validation of same attestation', async function () {
+      const attestation = '0x1234';
+      const responseData = '0x5678';
+      
+      await expect(
+        validator.connect(user2).validate(attestation, 1, responseData)
+      ).to.be.revertedWithCustomError(validator, 'AlreadyValidated');
+    });
 
-      const job = await escrow.getJob(jobId);
-      expect(job.status).to.equal(5);  // Settled
+    it('Should check if attestation is validated', async function () {
+      const isValid = await validator.isValidated(ethers.keccak256('0x1234'));
+      expect(isValid).to.be.true;
+      
+      const notValid = await validator.isValidated(ethers.keccak256('0x9999'));
+      expect(notValid).to.be.false;
+    });
+
+    it('Should fail for non-existent rule', async function () {
+      const attestation = '0xabcd';
+      const responseData = '0xef01';
+      
+      await expect(
+        validator.connect(user1).validate(attestation, 999, responseData)
+      ).to.be.revertedWithCustomError(validator, 'RuleNotFound');
     });
   });
 
@@ -197,6 +187,63 @@ describe('Veritas Protocol', function () {
       expect(typeof passed).to.equal('boolean');
       expect(score).to.be.gte(0);
       expect(score).to.be.lte(100);
+    });
+
+    it('Should calculate correct score', async function () {
+      const checkData = ethers.AbiCoder.defaultAbiCoder().encode(
+        ['string', 'string', 'uint256', 'uint256', 'bytes'],
+        ['https://api.example.com/*', 'GET', 200, 299, '0x']
+      );
+
+      const attestation = '0x';
+      const responseData = ethers.toUtf8Bytes(JSON.stringify({ 
+        data: 'a'.repeat(1000)  // Large response
+      }));
+
+      const [passed, score] = await httpCheck.validate(attestation, checkData, responseData);
+      
+      expect(score).to.be.gte(80);  // Should get bonus for large response
+    });
+  });
+
+  describe('Integration', function () {
+    
+    it('Should support multiple rules', async function () {
+      // Create second rule
+      const checkData = ethers.AbiCoder.defaultAbiCoder().encode(
+        ['string', 'string', 'uint256', 'uint256', 'bytes'],
+        ['https://api.another.com/*', 'GET', 200, 299, '0x']
+      );
+
+      await ruleRegistry.createRule(
+        'Another API Check',
+        'Another test rule',
+        await httpCheck.getAddress(),
+        checkData,
+        90
+      );
+
+      const count = await ruleRegistry.getRuleCount();
+      expect(count).to.equal(2);
+
+      // Validate with second rule
+      const attestation = '0x9999';
+      const responseData = '0x8888';
+      
+      await validator.connect(user1).validate(attestation, 2, responseData);
+      
+      const result = await validator.getValidationResult(ethers.keccak256(attestation));
+      expect(result.ruleId).to.equal(2);
+    });
+
+    it('Should support admin management', async function () {
+      // Add new admin
+      await ruleRegistry.addAdmin(user2.address);
+      expect(await ruleRegistry.admins(user2.address)).to.be.true;
+
+      // Remove admin
+      await ruleRegistry.removeAdmin(user2.address);
+      expect(await ruleRegistry.admins(user2.address)).to.be.false;
     });
   });
 });

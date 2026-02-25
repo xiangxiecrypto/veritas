@@ -151,14 +151,14 @@ contract HTTPCheck is ICheck {
             
             // Check if URL starts with prefix
             if (urlBytes.length >= prefix.length) {
-                bool match = true;
+                bool isMatch = true;
                 for (uint i = 0; i < prefix.length; i++) {
                     if (urlBytes[i] != prefix[i]) {
-                        match = false;
+                        isMatch = false;
                         break;
                     }
                 }
-                return match;
+                return isMatch;
             }
         }
         

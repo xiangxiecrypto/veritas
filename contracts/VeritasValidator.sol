@@ -6,8 +6,8 @@ import "./RuleRegistry.sol";
 
 /**
  * @title VeritasValidator
- * @notice Validates attestations from zktls-core-sdk
- * @dev Core validation contract for Veritas Protocol
+ * @notice Core validation contract for zktls-core-sdk attestations
+ * @dev Validates attestations without any business logic (no jobs, no escrow)
  */
 contract VeritasValidator {
     
@@ -19,28 +19,25 @@ contract VeritasValidator {
         uint256 score;
         uint256 timestamp;
         address validator;
-        bytes attestationHash;  // Hash of the attestation for reference
+        bytes32 attestationHash;
     }
     
-    // Mapping from job ID to validation result
+    // Mapping from attestation hash to validation result
     mapping(bytes32 => ValidationResult) public results;
     
     // Events
     event ValidationPerformed(
-        bytes32 indexed jobId,
+        bytes32 indexed attestationHash,
         uint256 indexed ruleId,
         bool passed,
         uint256 score,
         address validator
     );
     
-    event ValidationResultCleared(bytes32 indexed jobId);
-    
     // Errors
     error RuleNotActive(uint256 ruleId);
     error RuleNotFound(uint256 ruleId);
-    error ValidationFailed(uint256 ruleId, uint256 score, uint256 required);
-    error AlreadyValidated(bytes32 jobId);
+    error AlreadyValidated(bytes32 attestationHash);
     
     /**
      * @notice Constructor
@@ -52,24 +49,26 @@ contract VeritasValidator {
     }
     
     /**
-     * @notice Validate an attestation for a job
-     * @param jobId The job identifier
-     * @param ruleId The rule identifier
+     * @notice Validate an attestation against a rule
      * @param attestation The attestation data from zktls-core-sdk
-     * @param responseData The response data from API call
+     * @param ruleId The rule identifier
+     * @param responseData The response data to validate
      * @return passed Whether validation passed
-     * @return score The validation score
+     * @return score The validation score (0-100)
+     * @return attestationHash The hash of the attestation for reference
      */
     function validate(
-        bytes32 jobId,
-        uint256 ruleId,
         bytes calldata attestation,
+        uint256 ruleId,
         bytes calldata responseData
-    ) external returns (bool passed, uint256 score) {
+    ) external returns (bool passed, uint256 score, bytes32 attestationHash) {
+        
+        // Calculate attestation hash
+        attestationHash = keccak256(attestation);
         
         // Check if already validated
-        if (results[jobId].timestamp != 0) {
-            revert AlreadyValidated(jobId);
+        if (results[attestationHash].timestamp != 0) {
+            revert AlreadyValidated(attestationHash);
         }
         
         // Get the rule
@@ -97,35 +96,35 @@ contract VeritasValidator {
         }
         
         // Store the result
-        results[jobId] = ValidationResult({
+        results[attestationHash] = ValidationResult({
             ruleId: ruleId,
             passed: passed,
             score: score,
             timestamp: block.timestamp,
             validator: msg.sender,
-            attestationHash: keccak256(attestation)
+            attestationHash: attestationHash
         });
         
-        emit ValidationPerformed(jobId, ruleId, passed, score, msg.sender);
+        emit ValidationPerformed(attestationHash, ruleId, passed, score, msg.sender);
         
-        return (passed, score);
+        return (passed, score, attestationHash);
     }
     
     /**
-     * @notice Get validation result for a job
-     * @param jobId The job identifier
+     * @notice Get validation result by attestation hash
+     * @param attestationHash The hash of the attestation
      * @return ruleId The rule used
      * @return passed Whether validation passed
      * @return score The validation score
      * @return timestamp When validation was performed
      */
-    function getValidationResult(bytes32 jobId) external view returns (
+    function getValidationResult(bytes32 attestationHash) external view returns (
         uint256 ruleId,
         bool passed,
         uint256 score,
         uint256 timestamp
     ) {
-        ValidationResult memory result = results[jobId];
+        ValidationResult memory result = results[attestationHash];
         return (
             result.ruleId,
             result.passed,
@@ -135,22 +134,11 @@ contract VeritasValidator {
     }
     
     /**
-     * @notice Check if a job has been validated
-     * @param jobId The job identifier
-     * @return Whether the job has been validated
+     * @notice Check if an attestation has been validated
+     * @param attestationHash The hash of the attestation
+     * @return Whether the attestation has been validated
      */
-    function isValidated(bytes32 jobId) external view returns (bool) {
-        return results[jobId].timestamp != 0;
-    }
-    
-    /**
-     * @notice Clear validation result (only for testing)
-     * @param jobId The job identifier
-     */
-    function clearValidationResult(bytes32 jobId) external {
-        // This should be restricted in production
-        // Only for testing purposes
-        delete results[jobId];
-        emit ValidationResultCleared(jobId);
+    function isValidated(bytes32 attestationHash) external view returns (bool) {
+        return results[attestationHash].timestamp != 0;
     }
 }

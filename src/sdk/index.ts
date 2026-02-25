@@ -48,6 +48,8 @@ export interface AttestationResult {
   signature: string;
   /** Timestamp */
   timestamp: number;
+  /** Attestation hash */
+  attestationHash: string;
 }
 
 /**
@@ -62,32 +64,8 @@ export interface ValidationResult {
   ruleId: number;
   /** Validation timestamp */
   timestamp: number;
-}
-
-/**
- * Job structure (compatible with ACP)
- */
-export interface Job {
-  /** Job ID */
-  id: string;
-  /** Buyer address */
-  buyer: string;
-  /** Seller address */
-  seller: string;
-  /** Payment amount */
-  amount: bigint;
-  /** Job status */
-  status: number;
-  /** Whether verification is required */
-  verificationRequired: boolean;
-  /** Rule ID for verification */
-  ruleId: number;
-  /** Whether verification passed */
-  verificationPassed: boolean;
-  /** Verification score */
-  verificationScore: number;
-  /** Result data */
-  resultData: string;
+  /** Attestation hash */
+  attestationHash: string;
 }
 
 /**
@@ -145,12 +123,18 @@ export class VeritasSDK {
         signer: this.signer,
       });
 
-      // 3. Return result
+      // 3. Calculate attestation hash
+      const attestationHash = ethers.keccak256(
+        ethers.toUtf8Bytes(attestation.proof)
+      );
+
+      // 4. Return result
       return {
         attestation: attestation.proof,
         responseData: responseData,
         signature: attestation.signature,
         timestamp: Math.floor(Date.now() / 1000),
+        attestationHash: attestationHash,
       };
     } catch (error) {
       throw new Error(`Failed to execute with proof: ${error}`);
@@ -171,89 +155,104 @@ export class VeritasSDK {
   }
 
   /**
-   * Submit a completed job to the escrow contract
-   * @param escrowAddress Address of the EnhancedEscrow contract
-   * @param jobId Job identifier
-   * @param result Attestation result
-   */
-  async submitJobResult(
-    escrowAddress: string,
-    jobId: string,
-    result: AttestationResult
-  ): Promise<ethers.ContractTransactionReceipt> {
-    
-    const escrowAbi = [
-      'function completeJob(bytes32 jobId, bytes calldata attestation, bytes calldata responseData) external',
-    ];
-
-    const escrow = new Contract(escrowAddress, escrowAbi, this.signer);
-
-    const tx = await escrow.completeJob(
-      ethers.encodeBytes32String(jobId),
-      ethers.toUtf8Bytes(result.attestation),
-      ethers.toUtf8Bytes(JSON.stringify(result.responseData))
-    );
-
-    return await tx.wait();
-  }
-
-  /**
-   * Get job details from escrow
-   * @param escrowAddress Address of the EnhancedEscrow contract
-   * @param jobId Job identifier
-   * @returns Job details
-   */
-  async getJob(escrowAddress: string, jobId: string): Promise<Job> {
-    
-    const escrowAbi = [
-      'function getJob(bytes32 jobId) external view returns (tuple(bytes32 id, address buyer, address seller, uint256 amount, uint8 status, uint256 createdAt, uint256 acceptedAt, uint256 completedAt, uint256 confirmedAt, bool verificationRequired, uint256 ruleId, bool verificationPassed, uint256 verificationScore, bytes resultData))',
-    ];
-
-    const escrow = new Contract(escrowAddress, escrowAbi, this.signer);
-
-    const job = await escrow.getJob(ethers.encodeBytes32String(jobId));
-
-    return {
-      id: ethers.decodeBytes32String(job.id),
-      buyer: job.buyer,
-      seller: job.seller,
-      amount: job.amount,
-      status: job.status,
-      verificationRequired: job.verificationRequired,
-      ruleId: Number(job.ruleId),
-      verificationPassed: job.verificationPassed,
-      verificationScore: Number(job.verificationScore),
-      resultData: ethers.toUtf8String(job.resultData),
-    };
-  }
-
-  /**
-   * Check if a job has been verified
+   * Submit attestation to validator for on-chain validation
    * @param validatorAddress Address of the VeritasValidator contract
-   * @param jobId Job identifier
-   * @returns Validation result
+   * @param attestation The attestation data
+   * @param ruleId Rule ID to validate against
+   * @param responseData Response data
+   * @returns Validation result from blockchain
    */
-  async getValidationResult(
+  async validateAttestation(
     validatorAddress: string,
-    jobId: string
+    attestation: string,
+    ruleId: number,
+    responseData: any
   ): Promise<ValidationResult> {
     
     const validatorAbi = [
-      'function getValidationResult(bytes32 jobId) external view returns (uint256 ruleId, bool passed, uint256 score, uint256 timestamp)',
+      'function validate(bytes calldata attestation, uint256 ruleId, bytes calldata responseData) external returns (bool passed, uint256 score, bytes32 attestationHash)',
     ];
 
     const validator = new Contract(validatorAddress, validatorAbi, this.signer);
 
-    const result = await validator.getValidationResult(
-      ethers.encodeBytes32String(jobId)
+    const tx = await validator.validate(
+      ethers.toUtf8Bytes(attestation),
+      ruleId,
+      ethers.toUtf8Bytes(JSON.stringify(responseData))
     );
+
+    const receipt = await tx.wait();
+
+    // Parse event to get result
+    const event = receipt.logs.find((log: any) => {
+      try {
+        const parsed = validator.interface.parseLog(log);
+        return parsed?.name === 'ValidationPerformed';
+      } catch {
+        return false;
+      }
+    });
+
+    if (event) {
+      const parsed = validator.interface.parseLog(event);
+      return {
+        passed: parsed.args.passed,
+        score: Number(parsed.args.score),
+        ruleId: Number(parsed.args.ruleId),
+        timestamp: Math.floor(Date.now() / 1000),
+        attestationHash: parsed.args.attestationHash,
+      };
+    }
+
+    throw new Error('Validation event not found');
+  }
+
+  /**
+   * Get validation result from blockchain
+   * @param validatorAddress Address of the VeritasValidator contract
+   * @param attestationHash Hash of the attestation
+   * @returns Validation result
+   */
+  async getValidationResult(
+    validatorAddress: string,
+    attestationHash: string
+  ): Promise<ValidationResult> {
+    
+    const validatorAbi = [
+      'function getValidationResult(bytes32 attestationHash) external view returns (uint256 ruleId, bool passed, uint256 score, uint256 timestamp)',
+    ];
+
+    const validator = new Contract(validatorAddress, validatorAbi, this.signer);
+
+    const result = await validator.getValidationResult(attestationHash);
 
     return {
       ruleId: Number(result.ruleId),
       passed: result.passed,
       score: Number(result.score),
       timestamp: Number(result.timestamp),
+      attestationHash: attestationHash,
     };
+  }
+
+  /**
+   * Check if an attestation has been validated
+   * @param validatorAddress Address of the VeritasValidator contract
+   * @param attestationHash Hash of the attestation
+   * @returns Whether attestation has been validated
+   */
+  async isValidated(
+    validatorAddress: string,
+    attestationHash: string
+  ): Promise<boolean> {
+    
+    const validatorAbi = [
+      'function isValidated(bytes32 attestationHash) external view returns (bool)',
+    ];
+
+    const validator = new Contract(validatorAddress, validatorAbi, this.signer);
+
+    return await validator.isValidated(attestationHash);
   }
 }
 

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./interfaces/IVeritasValidator.sol";
 
@@ -122,7 +122,7 @@ contract EnhancedEscrow is ReentrancyGuard, Pausable, Ownable {
      * @notice Constructor
      * @param _validator Address of the VeritasValidator contract
      */
-    constructor(address _validator) {
+    constructor(address _validator) Ownable(msg.sender) {
         require(_validator != address(0), "Escrow: invalid validator");
         validator = IVeritasValidator(_validator);
     }

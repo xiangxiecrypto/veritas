@@ -1,12 +1,12 @@
 /**
  * @fileoverview Deployment script for Veritas Protocol
- * @description Deploys all contracts and sets up initial configuration
+ * @description Deploys verification contracts only (no escrow)
  */
 
 import { ethers } from 'hardhat';
 
 async function main() {
-  console.log('Deploying Veritas Protocol...\n');
+  console.log('Deploying Veritas Protocol - Verification Layer...\n');
 
   const [deployer] = await ethers.getSigners();
   console.log('Deployer:', deployer.address);
@@ -36,23 +36,15 @@ async function main() {
   const validatorAddress = await validator.getAddress();
   console.log('   VeritasValidator:', validatorAddress);
 
-  // 4. Deploy EnhancedEscrow
-  console.log('\n4. Deploying EnhancedEscrow...');
-  const EnhancedEscrow = await ethers.getContractFactory('EnhancedEscrow');
-  const escrow = await EnhancedEscrow.deploy(validatorAddress);
-  await escrow.waitForDeployment();
-  const escrowAddress = await escrow.getAddress();
-  console.log('   EnhancedEscrow:', escrowAddress);
-
-  // 5. Create sample rule
-  console.log('\n5. Creating sample rule...');
+  // 4. Create sample rule
+  console.log('\n4. Creating sample verification rule...');
   const checkData = ethers.AbiCoder.defaultAbiCoder().encode(
     ['string', 'string', 'uint256', 'uint256', 'bytes'],
     ['https://api.example.com/*', 'POST', 200, 299, '0x']
   );
 
   const createRuleTx = await ruleRegistry.createRule(
-    'Example API Check',
+    'Example API Verification',
     'Verify API calls to example.com',
     httpCheckAddress,
     checkData,
@@ -61,7 +53,7 @@ async function main() {
   await createRuleTx.wait();
   console.log('   Sample rule created (ID: 1)');
 
-  // 6. Print summary
+  // 5. Print summary
   console.log('\n========================================');
   console.log('Deployment Complete!');
   console.log('========================================\n');
@@ -71,16 +63,15 @@ async function main() {
   console.log(`RuleRegistry:     ${ruleRegistryAddress}`);
   console.log(`HTTPCheck:        ${httpCheckAddress}`);
   console.log(`VeritasValidator: ${validatorAddress}`);
-  console.log(`EnhancedEscrow:   ${escrowAddress}`);
 
   console.log('\nSample Rule:');
   console.log('------------');
   console.log('ID:              1');
-  console.log('Name:            Example API Check');
+  console.log('Name:            Example API Verification');
   console.log('Check Contract:  HTTPCheck');
   console.log('Required Score:  80');
 
-  // 7. Save deployment info
+  // 6. Save deployment info
   const deploymentInfo = {
     network: (await ethers.provider.getNetwork()).name,
     deployer: deployer.address,
@@ -88,13 +79,18 @@ async function main() {
       ruleRegistry: ruleRegistryAddress,
       httpCheck: httpCheckAddress,
       veritasValidator: validatorAddress,
-      enhancedEscrow: escrowAddress,
     },
     timestamp: new Date().toISOString(),
   };
 
   console.log('\nDeployment Info:');
   console.log(JSON.stringify(deploymentInfo, null, 2));
+
+  console.log('\n📝 Next Steps:');
+  console.log('1. Create more rules using RuleRegistry.createRule()');
+  console.log('2. Use VeritasSDK to generate proofs');
+  console.log('3. Validate proofs using VeritasValidator.validate()');
+  console.log('4. Integrate with ACP for commercial logic');
 }
 
 main()

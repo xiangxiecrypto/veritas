@@ -4,19 +4,6 @@
  */
 
 /**
- * Job status enum (must match contract)
- */
-export enum JobStatus {
-  Pending = 0,
-  InProgress = 1,
-  Completed = 2,
-  Confirmed = 3,
-  Disputed = 4,
-  Settled = 5,
-  Cancelled = 6,
-}
-
-/**
  * Rule structure from RuleRegistry
  */
 export interface Rule {
@@ -82,7 +69,6 @@ export interface DeploymentAddresses {
   ruleRegistry: string;
   veritasValidator: string;
   httpCheck: string;
-  escrow: string;
 }
 
 /**
