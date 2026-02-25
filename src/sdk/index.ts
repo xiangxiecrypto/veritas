@@ -67,9 +67,9 @@ export interface NeatAttestationResult {
 }
 
 /**
- * Validation result structure
+ * Validation result structure (matches VeritasValidator.ValidationResult)
  */
-export interface NeatValidationResult {
+export interface ValidationResult {
   /** Whether validation passed */
   passed: boolean;
   /** Rule ID used */
@@ -80,6 +80,8 @@ export interface NeatValidationResult {
   attestationHash: string;
   /** Attestation recipient */
   recipient: string;
+  /** Who submitted the attestation */
+  validator: string;
 }
 
 /**
@@ -173,7 +175,7 @@ export class NeatVeritasSDK {
     validatorAddress: string,
     attestation: any,
     ruleId: number
-  ): Promise<NeatValidationResult> {
+  ): Promise<ValidationResult> {
     
     const validatorAbi = [
       'function validate(tuple(address recipient, tuple(string url, string header, string method, string body) request, tuple(string keyName, string parseType, string parsePath)[] reponseResolve, string data, string attConditions, uint64 timestamp, string additionParams, tuple(address attestorAddr, string url)[] attestors, bytes[] signatures) attestation, uint256 ruleId) external returns (bool passed, bytes32 attestationHash)',
@@ -217,7 +219,7 @@ export class NeatVeritasSDK {
   async getValidationResult(
     validatorAddress: string,
     attestationHash: string
-  ): Promise<NeatValidationResult> {
+  ): Promise<ValidationResult> {
     
     const validatorAbi = [
       'function getValidationResult(bytes32 attestationHash) external view returns (uint256 ruleId, bool passed, uint256 timestamp, address recipient, address validator)',

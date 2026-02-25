@@ -1,12 +1,12 @@
 /**
  * @fileoverview Type definitions for Neat Veritas Protocol
- * @description Shared types for Neat Veritas SDK and contracts
+ * @description Shared types for SDK and contracts - aligned with contract structures
  */
 
 /**
- * Rule structure from RuleRegistry
+ * Rule structure (matches RuleRegistry.Rule)
  */
-export interface NeatRule {
+export interface Rule {
   id: bigint;
   name: string;
   description: string;
@@ -18,9 +18,9 @@ export interface NeatRule {
 }
 
 /**
- * HTTP check data structure
+ * HTTP check data structure (matches HTTPCheck.HTTPCheckData)
  */
-export interface NeatHTTPCheckData {
+export interface HTTPCheckData {
   expectedUrl: string;
   expectedMethod: string;
   minResponseCode: number;
@@ -30,28 +30,29 @@ export interface NeatHTTPCheckData {
 }
 
 /**
- * Validation result from VeritasValidator
+ * Validation result (matches VeritasValidator.ValidationResult)
  */
-export interface NeatOnChainValidationResult {
+export interface ValidationResult {
   ruleId: bigint;
   passed: boolean;
   timestamp: bigint;
   recipient: string;
   validator: string;
+  attestationHash: string;
 }
 
 /**
- * Attestation structure from Primus
+ * Attestation structure (matches IPrimusZKTLS.Attestation)
  */
-export interface NeatAttestation {
+export interface Attestation {
   recipient: string;
   request: {
     url: string;
+    header: string;
     method: string;
-    headers: string;
     body: string;
   };
-  responseResolve: Array<{
+  reponseResolve: Array<{
     keyName: string;
     parseType: string;
     parsePath: string;
@@ -70,7 +71,7 @@ export interface NeatAttestation {
 /**
  * Contract addresses for deployment
  */
-export interface NeatDeploymentAddresses {
+export interface DeploymentAddresses {
   ruleRegistry: string;
   veritasValidator: string;
   httpCheck: string;
@@ -80,7 +81,7 @@ export interface NeatDeploymentAddresses {
 /**
  * Deployment configuration
  */
-export interface NeatDeploymentConfig {
+export interface DeploymentConfig {
   network: string;
   deployer: string;
   initialAdmin: string;
