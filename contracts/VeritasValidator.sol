@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
 import "@primuslabs/zktls-contracts/src/IPrimusZKTLS.sol";
 import "./interfaces/ICheck.sol";
@@ -10,8 +10,7 @@ import "./RuleRegistry.sol";
  * @notice Core validation contract for Primus zktls attestations
  * @dev Validates attestations using Primus on-chain verification + custom checks
  * 
- * IMPORTANT: Attestation contains all necessary data (request, response, parsePath)
- * No need for separate responseData parameter - prevents data tampering
+ * SECURITY: Only the attestation recipient can submit their own attestation
  */
 contract VeritasValidator {
     
@@ -22,7 +21,8 @@ contract VeritasValidator {
         uint256 ruleId;
         bool passed;
         uint256 timestamp;
-        address validator;
+        address validator;          // Who submitted the attestation
+        address recipient;          // Who the attestation belongs to
         bytes32 attestationHash;
     }
     
@@ -32,6 +32,7 @@ contract VeritasValidator {
         bytes32 indexed attestationHash,
         uint256 indexed ruleId,
         bool passed,
+        address indexed recipient,
         address validator
     );
     
@@ -39,6 +40,7 @@ contract VeritasValidator {
     error RuleNotFound(uint256 ruleId);
     error AlreadyValidated(bytes32 attestationHash);
     error PrimusVerificationFailed();
+    error UnauthorizedRecipient(address expected, address actual);
     
     constructor(address _ruleRegistry, address _primusAddress) {
         require(_ruleRegistry != address(0), "Veritas: invalid registry");
@@ -51,22 +53,39 @@ contract VeritasValidator {
     /**
      * @notice Validate a Primus attestation against a rule
      * @param attestation The full attestation from Primus zktls-core-sdk
-     *        Contains: request, response, parsePath, data, signatures
+     *        Contains: recipient, request, response, parsePath, data, signatures
      * @param ruleId The rule identifier
      * @return passed Whether validation passed (true/false)
      * @return attestationHash The hash of the attestation for reference
      * 
-     * Security: Attestation contains all data, preventing tampering
+     * Security:
+     * 1. Only the attestation recipient can submit (attestation.recipient == msg.sender)
+     * 2. Attestation contains all data, preventing tampering
+     * 3. Primus verifies cryptographic proof
      */
     function validate(
         Attestation calldata attestation,
         uint256 ruleId
     ) external returns (bool passed, bytes32 attestationHash) {
         
+        // ========================================
+        // Step 1: Recipient Authorization Check
+        // ========================================
+        
+        // CRITICAL SECURITY: Only the recipient can submit their own attestation
+        if (attestation.recipient != msg.sender) {
+            revert UnauthorizedRecipient(attestation.recipient, msg.sender);
+            // Prevents: Anyone using someone else's attestation
+        }
+        
+        // ========================================
+        // Step 2: Input Validation
+        // ========================================
+        
         // Calculate attestation hash
         attestationHash = keccak256(abi.encode(attestation));
         
-        // Check if already validated
+        // Check if already validated (replay protection)
         if (results[attestationHash].timestamp != 0) {
             revert AlreadyValidated(attestationHash);
         }
@@ -82,7 +101,10 @@ contract VeritasValidator {
             revert RuleNotActive(ruleId);
         }
         
-        // 1. Verify attestation with Primus (verifies signature, data integrity, parsePath)
+        // ========================================
+        // Step 3: Primus Cryptographic Verification
+        // ========================================
+        
         try IPrimusZKTLS(primusAddress).verifyAttestation(attestation) {
             // Primus verified:
             // - Signature authenticity
@@ -93,44 +115,74 @@ contract VeritasValidator {
             revert PrimusVerificationFailed();
         }
         
-        // 2. Execute custom check logic (validates URL, method, response code, etc.)
+        // ========================================
+        // Step 4: Custom Check Validation
+        // ========================================
+        
         ICheck check = ICheck(rule.checkContract);
         
-        // Encode full attestation for check contract
         bytes memory attestationData = abi.encode(attestation);
         
         passed = check.validate(
-            attestationData,  // Contains all necessary data
+            attestationData,
             rule.checkData
         );
         
-        // Store the result
+        // ========================================
+        // Step 5: Result Storage
+        // ========================================
+        
         results[attestationHash] = ValidationResult({
             ruleId: ruleId,
             passed: passed,
             timestamp: block.timestamp,
             validator: msg.sender,
+            recipient: attestation.recipient,  // Store recipient
             attestationHash: attestationHash
         });
         
-        emit ValidationPerformed(attestationHash, ruleId, passed, msg.sender);
+        emit ValidationPerformed(
+            attestationHash,
+            ruleId,
+            passed,
+            attestation.recipient,
+            msg.sender
+        );
         
         return (passed, attestationHash);
     }
     
+    /**
+     * @notice Get validation result by attestation hash
+     * @param attestationHash The hash of the attestation
+     * @return ruleId The rule used
+     * @return passed Whether validation passed
+     * @return timestamp When validation was performed
+     * @return recipient Who the attestation belongs to
+     * @return validator Who submitted the attestation
+     */
     function getValidationResult(bytes32 attestationHash) external view returns (
         uint256 ruleId,
         bool passed,
-        uint256 timestamp
+        uint256 timestamp,
+        address recipient,
+        address validator
     ) {
         ValidationResult memory result = results[attestationHash];
         return (
             result.ruleId,
             result.passed,
-            result.timestamp
+            result.timestamp,
+            result.recipient,
+            result.validator
         );
     }
     
+    /**
+     * @notice Check if an attestation has been validated
+     * @param attestationHash The hash of the attestation
+     * @return Whether the attestation has been validated
+     */
     function isValidated(bytes32 attestationHash) external view returns (bool) {
         return results[attestationHash].timestamp != 0;
     }

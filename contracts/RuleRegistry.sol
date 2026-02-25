@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 /**
  * @title RuleRegistry
  * @notice Manages validation rules for Veritas Protocol
- * @dev Rules define how to validate attestations
+ * @dev Rules declare expectations, Checks validate implementation.
  */
 contract RuleRegistry {
     
@@ -12,8 +12,10 @@ contract RuleRegistry {
         uint256 id;
         string name;
         string description;
-        address checkContract;    // Check contract address
-        bytes checkData;          // Validation parameters
+        address checkContract;    // Check contract to execute validation
+        bytes checkData;          // Expected parameters (URL, method, response codes, etc.)
+        bool validateParsePath;   // Whether to validate parsePath
+        bytes expectedResponsePattern;  // Optional response pattern
         bool active;
         address creator;
         uint256 createdAt;
@@ -27,10 +29,15 @@ contract RuleRegistry {
     event RuleCreated(
         uint256 indexed ruleId,
         string name,
-        address indexed checkContract
+        address indexed checkContract,
+        bool validateParsePath
     );
     
-    event RuleUpdated(uint256 indexed ruleId, bool active);
+    event RuleUpdated(
+        uint256 indexed ruleId,
+        bool active
+    );
+    
     event AdminAdded(address indexed admin);
     event AdminRemoved(address indexed admin);
     
@@ -39,11 +46,23 @@ contract RuleRegistry {
         _;
     }
     
+    modifier ruleExists(uint256 _ruleId) {
+        require(rules[_ruleId].id != 0, "Veritas: rule not exists");
+        _;
+    }
+    
+    /**
+     * @notice Constructor
+     */
     constructor() {
         admins[msg.sender] = true;
         emit AdminAdded(msg.sender);
     }
     
+    /**
+     * @notice Add a new admin
+     * @param _admin Address to add as admin
+     */
     function addAdmin(address _admin) external onlyAdmin {
         require(_admin != address(0), "Veritas: invalid address");
         require(!admins[_admin], "Veritas: already admin");
@@ -52,6 +71,10 @@ contract RuleRegistry {
         emit AdminAdded(_admin);
     }
     
+    /**
+     * @notice Remove an admin
+     * @param _admin Address to remove
+     */
     function removeAdmin(address _admin) external onlyAdmin {
         require(_admin != msg.sender, "Veritas: cannot remove self");
         require(admins[_admin], "Veritas: not admin");
@@ -60,6 +83,15 @@ contract RuleRegistry {
         emit AdminRemoved(_admin);
     }
     
+    /**
+     * @notice Create a new rule
+     * @param _name Rule name
+     * @param _description Rule description
+     * @param _checkContract Address of the check contract
+     * @param _checkData Expected validation parameters:
+     *        Structure: encode(HTTPCheckData)
+     * @return ruleId The ID of the created rule
+     */
     function createRule(
         string calldata _name,
         string calldata _description,
@@ -77,6 +109,7 @@ contract RuleRegistry {
             description: _description,
             checkContract: _checkContract,
             checkData: _checkData,
+            validateParsePath: true,  // Default: validate parsePath
             active: true,
             creator: msg.sender,
             createdAt: block.timestamp
@@ -84,27 +117,51 @@ contract RuleRegistry {
         
         ruleIds.push(ruleId);
         
-        emit RuleCreated(ruleId, _name, _checkContract);
+        emit RuleCreated(ruleId, _name, _checkContract, true);  // validateParsePath default true
         
         return ruleId;
     }
     
-    function updateRuleStatus(uint256 _ruleId, bool _active) external onlyAdmin {
-        require(rules[_ruleId].id != 0, "Veritas: rule not exists");
-        
+    /**
+     * @notice Update rule status
+     * @param _ruleId Rule ID
+     * @param _active New status
+     */
+    function updateRuleStatus(uint256 _ruleId, bool _active) 
+        external 
+        onlyAdmin 
+        ruleExists(_ruleId) 
+    {
         rules[_ruleId].active = _active;
         emit RuleUpdated(_ruleId, _active);
     }
     
-    function getRule(uint256 _ruleId) external view returns (Rule memory) {
-        require(rules[_ruleId].id != 0, "Veritas: rule not exists");
+    /**
+     * @notice Get rule details
+     * @param _ruleId Rule ID
+     * @return Rule struct
+     */
+    function getRule(uint256 _ruleId) 
+        external 
+        view 
+        ruleExists(_ruleId) 
+        returns (Rule memory) 
+    {
         return rules[_ruleId];
     }
     
+    /**
+     * @notice Get all rule IDs
+     * @return Array of rule IDs
+     */
     function getAllRuleIds() external view returns (uint256[] memory) {
         return ruleIds;
     }
     
+    /**
+     * @notice Get rule count
+     * @return Number of rules
+     */
     function getRuleCount() external view returns (uint256) {
         return ruleIds.length;
     }
