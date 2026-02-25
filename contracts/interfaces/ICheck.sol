@@ -9,14 +9,12 @@ pragma solidity ^0.8.0;
 interface ICheck {
     /**
      * @notice Validate an attestation
-     * @param attestation The attestation data from zktls-core-sdk
+     * @param attestationData The full attestation data (includes request, response, parsePath)
      * @param checkData Custom data for this check
-     * @param responseData The response data from API call
      * @return passed Whether validation passed (true/false)
      */
     function validate(
-        bytes calldata attestation,
-        bytes calldata checkData,
-        bytes calldata responseData
-    ) external view returns (bool passed);
+        bytes calldata attestationData,  // Full attestation (includes data + parsePath)
+        bytes calldata checkData
+    ) external pure returns (bool passed);
 }

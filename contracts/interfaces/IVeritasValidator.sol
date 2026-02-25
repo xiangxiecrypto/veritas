@@ -11,16 +11,18 @@ import "@primuslabs/zktls-contracts/src/IPrimusZKTLS.sol";
 interface IVeritasValidator {
     /**
      * @notice Validate a Primus attestation against a rule
-     * @param attestation The attestation data
+     * @param attestation The full attestation (contains all necessary data)
+     *        - request: URL, method, headers, body
+     *        - responseResolve: parsePath, parseType, keyName
+     *        - data: Actual response data (JSON string)
+     *        - signatures: Cryptographic proof
      * @param ruleId The rule identifier
-     * @param responseData The response data
      * @return passed Whether validation passed
      * @return attestationHash The hash of the attestation
      */
     function validate(
         Attestation calldata attestation,
-        uint256 ruleId,
-        bytes calldata responseData
+        uint256 ruleId
     ) external returns (bool passed, bytes32 attestationHash);
     
     /**
