@@ -1,4 +1,4 @@
-# Security: Attestation Data Integrity
+# Veritas Neat - Security: Attestation Data Integrity
 
 ## ⚠️ Critical Security Fix
 

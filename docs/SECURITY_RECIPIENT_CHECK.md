@@ -1,4 +1,4 @@
-# CRITICAL SECURITY: Recipient Address Verification
+# Veritas Neat - Security: Recipient Verification
 
 ## ⚠️ Security Vulnerability Fixed
 

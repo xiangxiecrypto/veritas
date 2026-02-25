@@ -1,4 +1,4 @@
-# Primus Integration Guide
+# Veritas Neat - Primus Integration Guide
 
 This document explains how Veritas Protocol integrates with Primus Labs for on-chain attestation verification.
 

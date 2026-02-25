@@ -1,4 +1,4 @@
-# Veritas Protocol Validation Details
+# Veritas Neat - Validation Details
 
 ## 🔍 Complete Validation Flow
 

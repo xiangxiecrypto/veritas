@@ -1,4 +1,4 @@
-# Veritas Protocol Rules Guide
+# Veritas Neat - Rules Guide
 
 ## 🎯 What are Rules?
 
