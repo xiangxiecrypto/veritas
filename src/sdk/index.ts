@@ -13,6 +13,10 @@ import { PrimusZKTLS } from '@primus-labs/zktls-core-sdk';
 export interface NeatVeritasConfig {
   /** Signer for transaction signing */
   signer: Signer;
+  
+  /** Veritas validator contract address (fixed) */
+  validatorAddress: string;
+  
   /** zktls-core-sdk configuration */
   primusConfig?: {
     /** Primus App ID */
@@ -53,7 +57,7 @@ export interface ResponseResolve {
 /**
  * Attestation result structure
  */
-export interface NeatAttestationResult {
+export interface AttestationResult {
   /** The attestation object */
   attestation: any;  // Attestation struct from Primus
   /** The response data */
@@ -92,6 +96,7 @@ export class NeatVeritasSDK {
   private primus: PrimusZKTLS;
   private signer: Signer;
   private config: NeatVeritasConfig;
+  private validatorAddress: string;
 
   /**
    * Create a new Neat Veritas SDK instance
@@ -100,6 +105,7 @@ export class NeatVeritasSDK {
   constructor(config: NeatVeritasConfig) {
     this.config = config;
     this.signer = config.signer;
+    this.validatorAddress = config.validatorAddress;
     
     // Initialize Primus ZKTLS
     this.primus = new PrimusZKTLS({
@@ -122,6 +128,14 @@ export class NeatVeritasSDK {
   }
 
   /**
+   * Get the configured validator address
+   * @returns Validator contract address
+   */
+  getValidatorAddress(): string {
+    return this.validatorAddress;
+  }
+
+  /**
    * Generate an attestation for an API call
    * @param request API request configuration
    * @param responseResolves Response extraction configuration
@@ -130,7 +144,7 @@ export class NeatVeritasSDK {
   async attest(
     request: APIRequest,
     responseResolves?: ResponseResolve[]
-  ): Promise<NeatAttestationResult> {
+  ): Promise<AttestationResult> {
     try {
       // Prepare attestation request
       const attestRequest = {
@@ -166,22 +180,25 @@ export class NeatVeritasSDK {
 
   /**
    * Submit attestation to validator for on-chain validation
-   * @param validatorAddress Address of the VeritasValidator contract
    * @param attestation The attestation object
    * @param ruleId Rule ID to validate against
+   * @param validatorAddress Optional: Override configured validator address
    * @returns Validation result from blockchain
    */
   async validateAttestation(
-    validatorAddress: string,
     attestation: any,
-    ruleId: number
+    ruleId: number,
+    validatorAddress?: string
   ): Promise<ValidationResult> {
+    
+    // Use provided address or configured address
+    const address = validatorAddress || this.validatorAddress;
     
     const validatorAbi = [
       'function validate(tuple(address recipient, tuple(string url, string header, string method, string body) request, tuple(string keyName, string parseType, string parsePath)[] reponseResolve, string data, string attConditions, uint64 timestamp, string additionParams, tuple(address attestorAddr, string url)[] attestors, bytes[] signatures) attestation, uint256 ruleId) external returns (bool passed, bytes32 attestationHash)',
     ];
 
-    const validator = new Contract(validatorAddress, validatorAbi, this.signer);
+    const validator = new Contract(address, validatorAbi, this.signer);
 
     const tx = await validator.validate(attestation, ruleId);
     const receipt = await tx.wait();
@@ -204,6 +221,7 @@ export class NeatVeritasSDK {
         timestamp: Math.floor(Date.now() / 1000),
         attestationHash: parsed.args.attestationHash,
         recipient: parsed.args.recipient,
+        validator: parsed.args.validator,
       };
     }
 
@@ -212,20 +230,23 @@ export class NeatVeritasSDK {
 
   /**
    * Get validation result from blockchain
-   * @param validatorAddress Address of the VeritasValidator contract
    * @param attestationHash Hash of the attestation
+   * @param validatorAddress Optional: Override configured validator address
    * @returns Validation result
    */
   async getValidationResult(
-    validatorAddress: string,
-    attestationHash: string
+    attestationHash: string,
+    validatorAddress?: string
   ): Promise<ValidationResult> {
+    
+    // Use provided address or configured address
+    const address = validatorAddress || this.validatorAddress;
     
     const validatorAbi = [
       'function getValidationResult(bytes32 attestationHash) external view returns (uint256 ruleId, bool passed, uint256 timestamp, address recipient, address validator)',
     ];
 
-    const validator = new Contract(validatorAddress, validatorAbi, this.signer);
+    const validator = new Contract(address, validatorAbi, this.signer);
 
     const result = await validator.getValidationResult(attestationHash);
 
@@ -235,25 +256,29 @@ export class NeatVeritasSDK {
       timestamp: Number(result.timestamp),
       attestationHash: attestationHash,
       recipient: result.recipient,
+      validator: result.validator,
     };
   }
 
   /**
    * Check if an attestation has been validated
-   * @param validatorAddress Address of the VeritasValidator contract
    * @param attestationHash Hash of the attestation
+   * @param validatorAddress Optional: Override configured validator address
    * @returns Whether attestation has been validated
    */
   async isValidated(
-    validatorAddress: string,
-    attestationHash: string
+    attestationHash: string,
+    validatorAddress?: string
   ): Promise<boolean> {
+    
+    // Use provided address or configured address
+    const address = validatorAddress || this.validatorAddress;
     
     const validatorAbi = [
       'function isValidated(bytes32 attestationHash) external view returns (bool)',
     ];
 
-    const validator = new Contract(validatorAddress, validatorAbi, this.signer);
+    const validator = new Contract(address, validatorAbi, this.signer);
 
     return await validator.isValidated(attestationHash);
   }
