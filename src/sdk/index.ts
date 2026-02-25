@@ -1,16 +1,16 @@
 /**
- * @fileoverview Veritas SDK - Simplified verification protocol
- * @description SDK for generating and verifying attestations
- * @module @veritas/sdk
+ * @fileoverview NeatVeritasSDK - Simplified verification protocol
+ * @description SDK for generating and verifying attestations with Veritas Protocol
+ * @module @veritas/neat-sdk
  */
 
 import { ethers, Signer, Contract } from 'ethers';
 import { PrimusCoreTLS } from '@primuslabs/zktls-core-sdk';
 
 /**
- * Configuration for Veritas SDK
+ * Configuration for NeatVeritasSDK
  */
-export interface VeritasConfig {
+export interface NeatVeritasConfig {
   /** Signer for transaction signing */
   signer: Signer;
   /** VeritasValidator contract address */
@@ -126,9 +126,10 @@ export interface ValidationResult {
 }
 
 /**
- * Veritas SDK class
+ * NeatVeritasSDK class
+ * @description Main SDK for interacting with the Neat Veritas Protocol
  */
-export class VeritasSDK {
+export class NeatVeritasSDK {
   private primus: PrimusCoreTLS;
   private signer: Signer;
   private validatorAddress: string;
@@ -136,10 +137,10 @@ export class VeritasSDK {
   private appSecret: string;
 
   /**
-   * Create a new Veritas SDK instance
+   * Create a new NeatVeritasSDK instance
    * @param config Configuration options
    */
-  constructor(config: VeritasConfig) {
+  constructor(config: NeatVeritasConfig) {
     this.signer = config.signer;
     this.validatorAddress = config.validatorAddress;
     this.appId = config.appId;
@@ -319,4 +320,4 @@ export class VeritasSDK {
   }
 }
 
-export default VeritasSDK;
+export default NeatVeritasSDK;

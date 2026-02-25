@@ -9,7 +9,7 @@ const config = require("../deployed-config.json");
 const APP_ID = '0xd260f1ace82a81d1784d20a3cf38e94a17777374';
 const APP_SECRET = '0x5d065922ad4742d567a9de666f4876d91238ef390af77463f74d683292e78304';
 
-class VeritasSDK {
+class NeatVeritasSDK {
   constructor(config) {
     this.signer = config.signer;
     this.validatorAddress = config.validatorAddress;
@@ -101,7 +101,7 @@ async function main() {
   const [signer] = await ethers.getSigners();
   console.log('Signer:', signer.address);
 
-  const sdk = new VeritasSDK({
+  const sdk = new NeatVeritasSDK({
     signer,
     validatorAddress: config.contracts.VeritasValidator,
     appId: APP_ID,
