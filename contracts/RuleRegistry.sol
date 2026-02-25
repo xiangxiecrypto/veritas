@@ -110,6 +110,7 @@ contract RuleRegistry {
             checkContract: _checkContract,
             checkData: _checkData,
             validateParsePath: true,  // Default: validate parsePath
+            expectedResponsePattern: "",  // Default: no pattern
             active: true,
             creator: msg.sender,
             createdAt: block.timestamp

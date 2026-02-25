@@ -1,0 +1,9 @@
+
+> @veritas/neat@2.1.0 test
+> hardhat test
+
+Compiled 6 Solidity files successfully (evm target: paris).
+
+
+  0 passing (1ms)
+

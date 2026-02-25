@@ -1,0 +1,50 @@
+
+> @veritas/neat@2.1.0 test
+> hardhat test
+
+TypeError: Contract "HTTPCheck" should be marked as abstract.
+  --> contracts/checks/HTTPCheck.sol:12:1:
+   |
+12 | contract HTTPCheck is ICheck {
+   | ^ (Relevant source part starts here and spans across multiple lines).
+Note: Missing implementation: 
+  --> contracts/interfaces/ICheck.sol:33:5:
+   |
+33 |     function isCompatible(
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+
+TypeError: Wrong argument count for function call: 4 arguments given but expected 2.
+   --> contracts/EnhancedEscrow.sol:244:44:
+    |
+244 |             (bool passed, uint256 score) = validator.validate(
+    |                                            ^ (Relevant source part starts here and spans across multiple lines).
+
+
+TypeError: Type bytes32 is not implicitly convertible to expected type uint256.
+   --> contracts/EnhancedEscrow.sol:244:13:
+    |
+244 |             (bool passed, uint256 score) = validator.validate(
+    |             ^ (Relevant source part starts here and spans across multiple lines).
+
+
+TypeError: Wrong argument count for struct constructor: 9 arguments given but expected 10.
+   --> contracts/RuleRegistry.sol:106:25:
+    |
+106 |         rules[ruleId] = Rule({
+    |                         ^ (Relevant source part starts here and spans across multiple lines).
+
+
+Error HH600: Compilation failed
+
+HardhatError: HH600: Compilation failed
+    at SimpleTaskDefinition.action (/home/xiang/.openclaw/workspace/veritas-protocol/node_modules/hardhat/src/builtin-tasks/compile.ts:504:15)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at Environment._runTaskDefinition (/home/xiang/.openclaw/workspace/veritas-protocol/node_modules/hardhat/src/internal/core/runtime-environment.ts:351:14)
+    at OverriddenTaskDefinition._action (/home/xiang/.openclaw/workspace/veritas-protocol/node_modules/@typechain/hardhat/src/index.ts:28:30)
+    at Environment._runTaskDefinition (/home/xiang/.openclaw/workspace/veritas-protocol/node_modules/hardhat/src/internal/core/runtime-environment.ts:351:14)
+    at Environment.run (/home/xiang/.openclaw/workspace/veritas-protocol/node_modules/hardhat/src/internal/core/runtime-environment.ts:184:14)
+    at SimpleTaskDefinition.action (/home/xiang/.openclaw/workspace/veritas-protocol/node_modules/hardhat/src/builtin-tasks/compile.ts:1433:63)
+    at Environment._runTaskDefinition (/home/xiang/.openclaw/workspace/veritas-protocol/node_modules/hardhat/src/internal/core/runtime-environment.ts:351:14)
+    at Environment.run (/home/xiang/.openclaw/workspace/veritas-protocol/node_modules/hardhat/src/internal/core/runtime-environment.ts:184:14)
+    at SimpleTaskDefinition.action (/home/xiang/.openclaw/workspace/veritas-protocol/node_modules/hardhat/src/builtin-tasks/compile.ts:1513:7)
