@@ -1,4 +1,4 @@
-# Veritas Protocol - Verification Layer
+# Veritas Protocol - Binary Verification Layer
 
 **Cryptographic Verification for AI Agent Commerce**
 
@@ -6,13 +6,20 @@ A minimal verification protocol using zktls-core-sdk for direct TLS attestations
 
 ## 🎯 What is Veritas?
 
-Veritas is a **verification layer** that provides cryptographic proof of API calls and data authenticity. It does NOT handle:
+Veritas is a **verification layer** that provides cryptographic proof of API calls and data authenticity with **binary validation results only**.
 
-- ❌ Job management
-- ❌ Payment escrow
-- ❌ Business logic
+### ✅ What Veritas Does
+- Generate cryptographic proof of API calls
+- Validate proofs on-chain
+- Return **passed (true/false)** result
+- Simple, minimal, focused
 
-These are handled by **ACP (Agent Commerce Protocol)** or other commercial layers.
+### ❌ What Veritas Does NOT Do
+- Job management (ACP's job)
+- Payment escrow (ACP's job)
+- Score calculation (removed)
+- Threshold checking (removed)
+- Any business logic (ACP's job)
 
 ## 📋 Architecture
 
@@ -24,6 +31,10 @@ These are handled by **ACP (Agent Commerce Protocol)** or other commercial layer
                      │ Calls Veritas for verification
 ┌────────────────────▼────────────────────────────────┐
 │          Veritas Verification Layer                 │
+│                                                      │
+│  Input:  API Request + zktls Attestation           │
+│  Output: passed (true/false)                        │
+│                                                      │
 │  ┌──────────────┐  ┌──────────────┐               │
 │  │RuleRegistry  │  │Check Contracts│               │
 │  └──────┬───────┘  └──────┬───────┘               │
@@ -48,13 +59,12 @@ These are handled by **ACP (Agent Commerce Protocol)** or other commercial layer
 const ruleRegistry = await RuleRegistry.deploy();
 const validator = await VeritasValidator.deploy(ruleRegistry.address);
 
-// Create a rule
+// Create a rule (no score requirement)
 await ruleRegistry.createRule(
   'API Verification',
   'Verify API calls',
   httpCheckAddress,
-  checkData,
-  80  // required score
+  checkData
 );
 ```
 
@@ -80,25 +90,44 @@ const result = await veritas.executeWithProof({
 ### 3. Verify On-Chain (ACP side)
 ```typescript
 // ACP calls Veritas to verify
-const validationResult = await veritas.validateAttestation(
+const validation = await veritas.validateAttestation(
   validatorAddress,
   result.attestation,
   ruleId,
   result.responseData
 );
 
-// validationResult contains:
-// - passed: true/false
-// - score: 0-100
+// validation contains ONLY:
+// - passed: true/false (binary result)
+// - ruleId: which rule was used
+// - timestamp: when validated
 // - attestationHash: on-chain reference
 
-// ACP decides what to do based on result
-if (validationResult.passed && validationResult.score >= 80) {
+// ACP decides what to do based on binary result
+if (validation.passed) {
+  // Verification passed
   // Release payment, mark job as complete, etc.
 } else {
+  // Verification failed
   // Reject result, initiate dispute, etc.
 }
 ```
+
+## 🎯 Key Concept: Binary Validation
+
+**Veritas returns ONLY passed (true/false)**
+
+```solidity
+function validate(
+    bytes calldata attestation,
+    uint256 ruleId,
+    bytes calldata responseData
+) external returns (bool passed, bytes32 attestationHash)
+```
+
+**No score. No threshold. No complexity.**
+
+Just a simple yes/no answer.
 
 ## 🚀 Quick Start
 
@@ -134,11 +163,11 @@ npx hardhat run scripts/deploy.ts --network baseSepolia
 
 ### Smart Contracts
 
-| Contract | Description |
-|----------|-------------|
-| **RuleRegistry** | Manages validation rules |
-| **VeritasValidator** | Validates attestations |
-| **HTTPCheck** | HTTP API verification |
+| Contract | Description | Output |
+|----------|-------------|--------|
+| **RuleRegistry** | Manages validation rules | - |
+| **VeritasValidator** | Validates attestations | `passed: bool` |
+| **HTTPCheck** | HTTP API verification | `passed: bool` |
 
 ### SDK
 
@@ -160,6 +189,8 @@ const validation = await veritas.validateAttestation(
   ruleId,
   result.responseData
 );
+
+console.log(validation.passed); // true or false
 ```
 
 ## 🔗 Integration with ACP
@@ -183,10 +214,12 @@ const validation = await veritas.validateAttestation(
   proof.responseData
 );
 
-// 4. ACP acts based on verification result
+// 4. ACP acts based on binary verification result
 if (validation.passed) {
+  // Verification passed - release payment
   await acp.releasePayment(job.id);
 } else {
+  // Verification failed - reject result
   await acp.rejectResult(job.id);
 }
 ```
@@ -195,11 +228,13 @@ if (validation.passed) {
 
 ✅ **Cryptographic Proof** - zktls-core-sdk attestations  
 ✅ **On-Chain Verification** - Immutable validation records  
+✅ **Binary Result** - passed (true/false)  
 ✅ **Flexible Rules** - Customizable check logic  
-✅ **Score System** - 0-100 quality metrics  
 
 ## 🚫 What Veritas Does NOT Provide
 
+❌ **Score System** - No 0-100 metrics  
+❌ **Threshold Checking** - No minimum score  
 ❌ **Job Management** - No job creation/tracking  
 ❌ **Payment Handling** - No escrow or funds  
 ❌ **Dispute Resolution** - No arbitration  
@@ -211,10 +246,12 @@ These are provided by ACP or other commercial layers.
 
 | Operation | Gas Used | Cost (Base Sepolia) |
 |-----------|----------|---------------------|
-| Deploy RuleRegistry | ~800,000 | ~$0.012 |
-| Deploy VeritasValidator | ~600,000 | ~$0.009 |
-| Create Rule | ~100,000 | ~$0.0015 |
-| Validate Attestation | ~50,000 | ~$0.0008 |
+| Deploy RuleRegistry | ~750,000 | ~$0.011 |
+| Deploy VeritasValidator | ~550,000 | ~$0.008 |
+| Create Rule | ~90,000 | ~$0.0014 |
+| Validate Attestation | ~40,000 | ~$0.0006 |
+
+**Simplified validation = Lower gas costs**
 
 ## 🧪 Testing
 
@@ -241,7 +278,7 @@ class VeritasSDK {
   // Verify attestation locally
   async verifyAttestation(attestation: string): Promise<boolean>
   
-  // Validate attestation on-chain
+  // Validate attestation on-chain (returns passed: true/false)
   async validateAttestation(
     validatorAddress: string,
     attestation: string,
@@ -263,18 +300,28 @@ class VeritasSDK {
 }
 ```
 
+### ValidationResult
+
+```typescript
+interface ValidationResult {
+  passed: boolean;          // Binary result: true/false
+  ruleId: number;           // Rule used for validation
+  timestamp: number;        // When validated
+  attestationHash: string;  // On-chain reference
+}
+```
+
 ### Smart Contracts
 
 #### RuleRegistry
 
 ```solidity
-// Create a new rule
+// Create a new rule (no score requirement)
 function createRule(
   string name,
   string description,
   address checkContract,
-  bytes checkData,
-  uint256 requiredScore
+  bytes checkData
 ) returns (uint256 ruleId)
 
 // Get rule details
@@ -287,23 +334,33 @@ function updateRuleStatus(uint256 ruleId, bool active)
 #### VeritasValidator
 
 ```solidity
-// Validate an attestation
+// Validate an attestation (binary result only)
 function validate(
   bytes attestation,
   uint256 ruleId,
   bytes responseData
-) returns (bool passed, uint256 score, bytes32 attestationHash)
+) returns (bool passed, bytes32 attestationHash)
 
 // Get validation result
 function getValidationResult(bytes32 attestationHash) returns (
   uint256 ruleId,
   bool passed,
-  uint256 score,
   uint256 timestamp
 )
 
 // Check if validated
 function isValidated(bytes32 attestationHash) returns (bool)
+```
+
+#### ICheck
+
+```solidity
+// Check contract interface (returns bool only)
+function validate(
+  bytes attestation,
+  bytes checkData,
+  bytes responseData
+) returns (bool passed)
 ```
 
 ## 🔧 Configuration
@@ -328,18 +385,24 @@ await ruleRegistry.createRule(
   'API Verification',
   'Verify API calls',
   httpCheckAddress,
-  checkData,
-  80  // required score
+  checkData
+  // No score requirement
 );
 ```
 
-## 📝 Examples
+## 💡 Philosophy
 
-See `/examples` directory for:
-- Basic verification flow
-- ACP integration patterns
-- Custom check contracts
-- Multi-rule scenarios
+**Keep it simple:**
+
+1. **Generate proof** - zktls-core-sdk
+2. **Validate proof** - VeritasValidator
+3. **Return result** - passed (true/false)
+
+**That's it.**
+
+No scores. No thresholds. No complexity.
+
+Just cryptographic proof + binary validation.
 
 ## 🤝 Contributing
 
@@ -357,4 +420,4 @@ MIT License - see [LICENSE](./LICENSE).
 
 ---
 
-**Veritas = Truth. Simple verification for the AI Agent Economy.**
+**Veritas = Truth. Binary verification for the AI Agent Economy.**
