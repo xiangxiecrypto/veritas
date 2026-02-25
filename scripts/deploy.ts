@@ -1,16 +1,34 @@
 /**
  * @fileoverview Deployment script for Veritas Protocol
- * @description Deploys verification contracts only - binary validation (no score)
+ * @description Deploys verification contracts with Primus integration
  */
 
 import { ethers } from 'hardhat';
 
 async function main() {
-  console.log('Deploying Veritas Protocol - Binary Verification...\n');
+  console.log('Deploying Veritas Protocol with Primus Integration...\n');
 
   const [deployer] = await ethers.getSigners();
   console.log('Deployer:', deployer.address);
   console.log('Balance:', ethers.formatEther(await ethers.provider.getBalance(deployer.address)), 'ETH\n');
+
+  // Primus contract addresses (update based on network)
+  const PRIMUS_ADDRESSES = {
+    // Base Sepolia
+    baseSepolia: '0xC02234058caEaA9416506eABf6Ef3122fCA939E8',
+    // Base Mainnet
+    base: '0x...',  // Update with actual address
+    // Ethereum Mainnet
+    ethereum: '0x...',  // Update with actual address
+  };
+
+  const network = (await ethers.provider.getNetwork()).name;
+  const primusAddress = PRIMUS_ADDRESSES[network as keyof typeof PRIMUS_ADDRESSES] || ethers.ZeroAddress;
+
+  if (primusAddress === ethers.ZeroAddress) {
+    console.warn('⚠️  Warning: Primus address not configured for this network');
+    console.warn('   Please update PRIMUS_ADDRESSES in the deployment script\n');
+  }
 
   // 1. Deploy RuleRegistry
   console.log('1. Deploying RuleRegistry...');
@@ -28,15 +46,19 @@ async function main() {
   const httpCheckAddress = await httpCheck.getAddress();
   console.log('   HTTPCheck:', httpCheckAddress);
 
-  // 3. Deploy VeritasValidator
+  // 3. Deploy VeritasValidator with Primus address
   console.log('\n3. Deploying VeritasValidator...');
   const VeritasValidator = await ethers.getContractFactory('VeritasValidator');
-  const validator = await VeritasValidator.deploy(ruleRegistryAddress);
+  const validator = await VeritasValidator.deploy(
+    ruleRegistryAddress,
+    primusAddress
+  );
   await validator.waitForDeployment();
   const validatorAddress = await validator.getAddress();
   console.log('   VeritasValidator:', validatorAddress);
+  console.log('   Primus Address:', primusAddress);
 
-  // 4. Create sample rule (no score requirement)
+  // 4. Create sample rule
   console.log('\n4. Creating sample verification rule...');
   const checkData = ethers.AbiCoder.defaultAbiCoder().encode(
     ['string', 'string', 'uint256', 'uint256', 'bytes'],
@@ -62,22 +84,25 @@ async function main() {
   console.log(`RuleRegistry:     ${ruleRegistryAddress}`);
   console.log(`HTTPCheck:        ${httpCheckAddress}`);
   console.log(`VeritasValidator: ${validatorAddress}`);
+  console.log(`Primus ZKTLS:     ${primusAddress}`);
 
-  console.log('\nSample Rule:');
-  console.log('------------');
-  console.log('ID:              1');
-  console.log('Name:            Example API Verification');
-  console.log('Check Contract:  HTTPCheck');
-  console.log('Validation:      Binary (passed/failed)');
+  console.log('\nVerification Flow:');
+  console.log('------------------');
+  console.log('1. Generate attestation with Primus zktls-core-sdk');
+  console.log('2. Submit attestation to VeritasValidator.validate()');
+  console.log('3. VeritasValidator calls Primus.verifyAttestation()');
+  console.log('4. VeritasValidator executes custom Check logic');
+  console.log('5. Returns passed (true/false)');
 
   // 6. Save deployment info
   const deploymentInfo = {
-    network: (await ethers.provider.getNetwork()).name,
+    network: network,
     deployer: deployer.address,
     contracts: {
       ruleRegistry: ruleRegistryAddress,
       httpCheck: httpCheckAddress,
       veritasValidator: validatorAddress,
+      primusZKTLS: primusAddress,
     },
     timestamp: new Date().toISOString(),
   };
@@ -87,9 +112,9 @@ async function main() {
 
   console.log('\n📝 Next Steps:');
   console.log('1. Create more rules using RuleRegistry.createRule()');
-  console.log('2. Use VeritasSDK to generate proofs');
-  console.log('3. Validate proofs using VeritasValidator.validate()');
-  console.log('4. Result: passed (true/false) - no score');
+  console.log('2. Use Primus zktls-core-sdk to generate attestations');
+  console.log('3. Validate attestations using VeritasValidator.validate()');
+  console.log('4. Result: passed (true/false) - binary validation');
 }
 
 main()

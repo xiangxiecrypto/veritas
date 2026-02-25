@@ -1,22 +1,24 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
+
+import "@primuslabs/zktls-contracts/src/IPrimusZKTLS.sol";
 
 /**
  * @title IVeritasValidator
  * @notice Interface for Veritas validator contract
- * @dev Validates attestations from zktls-core-sdk
+ * @dev Validates attestations from Primus zktls-core-sdk
  */
 interface IVeritasValidator {
     /**
-     * @notice Validate an attestation against a rule
+     * @notice Validate a Primus attestation against a rule
      * @param attestation The attestation data
      * @param ruleId The rule identifier
      * @param responseData The response data
-     * @return passed Whether validation passed (true/false)
+     * @return passed Whether validation passed
      * @return attestationHash The hash of the attestation
      */
     function validate(
-        bytes calldata attestation,
+        Attestation calldata attestation,
         uint256 ruleId,
         bytes calldata responseData
     ) external returns (bool passed, bytes32 attestationHash);

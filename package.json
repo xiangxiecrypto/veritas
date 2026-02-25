@@ -18,7 +18,8 @@
     "zktls",
     "attestation",
     "blockchain",
-    "ai-agent"
+    "ai-agent",
+    "primus"
   ],
   "author": "Veritas Protocol",
   "license": "MIT",
@@ -30,7 +31,8 @@
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.0.0",
-    "@primuslabs/zktls-core-sdk": "^0.2.6",
+    "@primuslabs/zktls-contracts": "^1.0.0",
+    "@primus-labs/zktls-core-sdk": "^1.0.0",
     "ethers": "^6.9.0"
   },
   "engines": {
