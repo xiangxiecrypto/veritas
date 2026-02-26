@@ -9,8 +9,9 @@
  *      export PRIMUS_APP_ID="your_app_id"
  *      export PRIMUS_APP_SECRET="your_app_secret"
  * 
- *   2. Have deployed contracts (use scripts/deploy.js)
- *      Note: Validator address is hardcoded in the SDK
+ *   2. Contract addresses are hardcoded in the SDK:
+ *      - Validator: 0xca215CAaDa2d446481466b3D55eb152426065f9A
+ *      - RuleRegistry: 0xA03F539830fD53A7E1345b2BC815f3A66e19bC35
  */
 
 import { ethers } from "hardhat";
@@ -32,19 +33,21 @@ async function main() {
     console.log("Please set:");
     console.log("  export PRIMUS_APP_ID='your_app_id'");
     console.log("  export PRIMUS_APP_SECRET='your_app_secret'");
+    console.log("");
+    console.log("Note: Contract addresses are hardcoded in the SDK");
     return;
   }
 
   console.log("Configuration:");
   console.log("  App ID:", appId.substring(0, 10) + "...");
-  console.log("  Note: Validator address is hardcoded in SDK");
+  console.log("  Validator: (hardcoded in SDK)");
   console.log("");
 
   const [signer] = await ethers.getSigners();
   console.log("Signer:", signer.address);
   console.log("");
 
-  // Initialize SDK
+  // Initialize SDK (no validatorAddress needed!)
   console.log("STEP 1: Initialize SDK");
   console.log("----------------------------------------");
   

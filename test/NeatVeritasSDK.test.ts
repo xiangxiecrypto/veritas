@@ -8,7 +8,7 @@ describe("NeatVeritasSDK", function () {
   const describeIf = (condition: boolean) => condition ? describe : describe.skip;
   
   describe("SDK Initialization", function () {
-    it("should create SDK instance", function () {
+    it("should create SDK instance with minimal config", function () {
       const config = {
         signer: {} as any,
         appId: "0x0000000000000000000000000000000000000000",
@@ -17,6 +17,19 @@ describe("NeatVeritasSDK", function () {
       
       const sdk = new NeatVeritasSDK(config);
       expect(sdk).to.be.instanceOf(NeatVeritasSDK);
+    });
+    
+    it("should not require validatorAddress in config", function () {
+      // Validator address is hardcoded in SDK
+      const config = {
+        signer: {} as any,
+        appId: "0x1234",
+        appSecret: "0x5678",
+      };
+      
+      // This should work without validatorAddress
+      const sdk = new NeatVeritasSDK(config);
+      expect(sdk).to.exist;
     });
   });
   
