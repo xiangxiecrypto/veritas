@@ -5,16 +5,17 @@
 
 const { ethers } = require("hardhat");
 const { PrimusCoreTLS } = require("@primuslabs/zktls-core-sdk");
-const config = require("../deployed-config.json");
 
 const APP_ID = '0xd260f1ace82a81d1784d20a3cf38e94a17777374';
 const APP_SECRET = '0x5d065922ad4742d567a9de666f4876d91238ef390af77463f74d683292e78304';
+
+// Hardcoded contract addresses (Base Sepolia)
+const VALIDATOR_ADDRESS = '0xca215CAaDa2d446481466b3D55eb152426065f9A';
 
 // SDK Implementation
 class NeatVeritasSDK {
   constructor(config) {
     this.signer = config.signer;
-    this.validatorAddress = config.validatorAddress;
     this.appId = config.appId;
     this.appSecret = config.appSecret;
     this.primus = new PrimusCoreTLS();
@@ -63,7 +64,7 @@ class NeatVeritasSDK {
       'event ValidationPerformed(bytes32 indexed attestationHash, uint256 indexed ruleId, bool passed, address indexed recipient, address validator)',
     ];
 
-    const validator = new ethers.Contract(this.validatorAddress, validatorAbi, this.signer);
+    const validator = new ethers.Contract(VALIDATOR_ADDRESS, validatorAbi, this.signer);
     const tx = await validator.validate(attestation, ruleId);
     const receipt = await tx.wait();
 
@@ -142,7 +143,7 @@ async function main() {
 
   const [signer] = await ethers.getSigners();
   console.log('Signer Address:', signer.address);
-  console.log('Validator:', config.contracts.VeritasValidator);
+  console.log('Validator:', VALIDATOR_ADDRESS, '(hardcoded)');
   console.log('');
 
   // Initialize SDK
@@ -152,7 +153,6 @@ async function main() {
 
   const sdk = new NeatVeritasSDK({
     signer,
-    validatorAddress: config.contracts.VeritasValidator,
     appId: APP_ID,
     appSecret: APP_SECRET,
   });

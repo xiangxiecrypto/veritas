@@ -7,14 +7,17 @@
 import { ethers, Signer, Contract } from 'ethers';
 import { PrimusCoreTLS } from '@primuslabs/zktls-core-sdk';
 
+// Hardcoded contract addresses (Base Sepolia)
+const VALIDATOR_ADDRESS = '0xca215CAaDa2d446481466b3D55eb152426065f9A';
+const RULE_REGISTRY_ADDRESS = '0xA03F539830fD53A7E1345b2BC815f3A66e19bC35';
+const PRIMUS_ZKTLS_ADDRESS = '0xCE7cefB3B5A7eB44B59F60327A53c9Ce53B0afdE';
+
 /**
  * Configuration for NeatVeritasSDK
  */
 export interface NeatVeritasConfig {
   /** Signer for transaction signing */
   signer: Signer;
-  /** VeritasValidator contract address */
-  validatorAddress: string;
   /** Primus App ID */
   appId: string;
   /** Primus App Secret */
@@ -132,17 +135,15 @@ export interface ValidationResult {
 export class NeatVeritasSDK {
   private primus: PrimusCoreTLS;
   private signer: Signer;
-  private validatorAddress: string;
   private appId: string;
   private appSecret: string;
 
   /**
    * Create a new NeatVeritasSDK instance
-   * @param config Configuration options
+   * @param config Configuration options (signer, appId, appSecret)
    */
   constructor(config: NeatVeritasConfig) {
     this.signer = config.signer;
-    this.validatorAddress = config.validatorAddress;
     this.appId = config.appId;
     this.appSecret = config.appSecret;
     this.primus = new PrimusCoreTLS();
@@ -218,7 +219,7 @@ export class NeatVeritasSDK {
       'event ValidationPerformed(bytes32 indexed attestationHash, uint256 indexed ruleId, bool passed, address indexed recipient, address validator)',
     ];
 
-    const validator = new Contract(this.validatorAddress, validatorAbi, this.signer);
+    const validator = new Contract(VALIDATOR_ADDRESS, validatorAbi, this.signer);
 
     const tx = await validator.validate(attestation, ruleId);
     const receipt = await tx.wait();
@@ -262,7 +263,7 @@ export class NeatVeritasSDK {
       'function results(bytes32 attestationHash) view returns (uint256 ruleId, bool passed, uint256 timestamp, address validator, address recipient, bytes32 hash)',
     ];
 
-    const validator = new Contract(this.validatorAddress, validatorAbi, this.signer);
+    const validator = new Contract(VALIDATOR_ADDRESS, validatorAbi, this.signer);
     const result = await validator.results(attestationHash);
 
     return {

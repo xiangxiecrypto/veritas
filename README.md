@@ -55,9 +55,9 @@ npx hardhat run test/run-integration-test.ts --network baseSepolia
 import { NeatVeritasSDK } from './src/sdk';
 import { ethers } from 'ethers';
 
+// Note: Validator address is hardcoded in the SDK
 const sdk = new NeatVeritasSDK({
   signer: wallet,
-  validatorAddress: '0x...',
   appId: '0x...',
   appSecret: '0x...'
 });

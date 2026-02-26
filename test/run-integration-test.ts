@@ -8,10 +8,9 @@
  *   1. Set environment variables:
  *      export PRIMUS_APP_ID="your_app_id"
  *      export PRIMUS_APP_SECRET="your_app_secret"
- *      export VALIDATOR_ADDRESS="deployed_validator_address"
- *      export DEFAULT_RULE_ID="1"
  * 
  *   2. Have deployed contracts (use scripts/deploy.js)
+ *      Note: Validator address is hardcoded in the SDK
  */
 
 import { ethers } from "hardhat";
@@ -26,21 +25,19 @@ async function main() {
   // Check environment
   const appId = process.env.PRIMUS_APP_ID;
   const appSecret = process.env.PRIMUS_APP_SECRET;
-  const validatorAddress = process.env.VALIDATOR_ADDRESS;
 
-  if (!appId || !appSecret || !validatorAddress) {
+  if (!appId || !appSecret) {
     console.log("❌ Missing environment variables!");
     console.log("");
     console.log("Please set:");
     console.log("  export PRIMUS_APP_ID='your_app_id'");
     console.log("  export PRIMUS_APP_SECRET='your_app_secret'");
-    console.log("  export VALIDATOR_ADDRESS='validator_address'");
     return;
   }
 
   console.log("Configuration:");
-  console.log("  Validator:", validatorAddress);
   console.log("  App ID:", appId.substring(0, 10) + "...");
+  console.log("  Note: Validator address is hardcoded in SDK");
   console.log("");
 
   const [signer] = await ethers.getSigners();
@@ -53,7 +50,6 @@ async function main() {
   
   const sdk = new NeatVeritasSDK({
     signer,
-    validatorAddress,
     appId,
     appSecret,
   });

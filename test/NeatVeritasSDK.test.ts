@@ -11,7 +11,6 @@ describe("NeatVeritasSDK", function () {
     it("should create SDK instance", function () {
       const config = {
         signer: {} as any,
-        validatorAddress: "0x0000000000000000000000000000000000000000",
         appId: "0x0000000000000000000000000000000000000000",
         appSecret: "0x0000000000000000000000000000000000000000",
       };
@@ -32,7 +31,6 @@ describe("NeatVeritasSDK", function () {
       
       const config = {
         signer,
-        validatorAddress: process.env.VALIDATOR_ADDRESS || "",
         appId: process.env.PRIMUS_APP_ID || "",
         appSecret: process.env.PRIMUS_APP_SECRET || "",
       };
