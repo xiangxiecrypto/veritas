@@ -1,60 +1,67 @@
-# Veritas Neat Documentation
+# NeatVeritasSDK Documentation
 
-## 📚 Documentation Index
+## Overview
 
-### Getting Started
-- **[README.md](../README.md)** - Quick start guide
-- **[Primus Integration](./PRIMUS_INTEGRATION.md)** - How to integrate Primus
+NeatVeritasSDK enables agents to prove API calls on-chain using Primus ZKTLS technology.
 
-### Core Concepts
-- **[Rules Guide](./RULES_GUIDE.md)** - How to create and use rules
-- **[Validation Details](./VALIDATION_DETAILS.md)** - How validation works
+## Key Concepts
 
-### Security
-- **[Recipient Verification](./SECURITY_RECIPIENT_CHECK.md)** - Owner-only attestation submission
-- **[Attestation Data Integrity](./SECURITY_ATTESTATION_DATA.md)** - Data tampering prevention
+### Attestation
 
----
+An attestation is cryptographic proof that:
+1. An API call was made
+2. The response data is authentic
+3. The timestamp is accurate
 
-## 📖 Reading Order
+### Validation
 
-### For Beginners
-1. README.md - Understand what Veritas Neat is
-2. Rules Guide - Learn how to create rules
-3. Primus Integration - Set up Primus SDK
+Validation verifies:
+1. The attestation signature is valid
+2. The timestamp is within the allowed age
+3. The data matches the rule requirements
 
-### For Developers
-1. Validation Details - Understand the validation flow
-2. Security docs - Learn security measures
-3. Smart contracts - Read contract code
+## Getting Started
 
-### For Security Auditors
-1. Security: Recipient Verification
-2. Security: Attestation Data Integrity
-3. Validation Details
-4. Smart contract code
+See the main [README](../README.md) for quick start guide.
 
----
+## Examples
 
-## 🔍 Quick Reference
+### Weather Data Verification
 
-| Topic | Document | Key Points |
-|-------|----------|------------|
-| **Setup** | README + Primus Integration | Install SDK, configure Primus |
-| **Rules** | Rules Guide | Create rules for validation |
-| **Validation** | Validation Details | How attestation verification works |
-| **Security 1** | Recipient Verification | Only owner can submit |
-| **Security 2** | Attestation Data | All data from attestation |
+```typescript
+const result = await sdk.attest(
+  {
+    url: 'https://api.openweathermap.org/data/2.5/weather?q=London',
+    method: 'GET',
+  },
+  [
+    {
+      keyName: 'temp',
+      parseType: 'string',
+      parsePath: '$.main.temp',
+    },
+  ]
+);
+```
 
----
+### News Source Verification
 
-## 🚀 Quick Links
+```typescript
+const result = await sdk.attest(
+  {
+    url: 'https://newsapi.org/v2/top-headlines?country=us',
+    method: 'GET',
+  },
+  [
+    {
+      keyName: 'articles',
+      parseType: 'string',
+      parsePath: '$.articles[0].title',
+    },
+  ]
+);
+```
 
-- **GitHub**: https://github.com/xiangxiecrypto/veritas
-- **NPM Package**: `@veritas/neat`
-- **Primus Labs**: https://primuslabs.xyz
-- **Virtuals Protocol**: https://virtuals.io
+## Test Results
 
----
-
-**Veritas Neat = Simple Documentation** 📚
+See [TEST_REPORT.md](./TEST_REPORT.md) for detailed test results.

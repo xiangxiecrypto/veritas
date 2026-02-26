@@ -1,294 +1,144 @@
-# Veritas Neat
+# NeatVeritasSDK
 
-**Binary Verification Layer for AI Agent Commerce**
+A TypeScript SDK for generating and verifying API attestations on-chain using Primus ZKTLS.
 
-A minimal, simplified verification protocol using Primus zktls-core-sdk.
+## Features
 
----
+- 🔐 **Cryptographic Proof**: Prove any API call happened
+- ⛓️ **On-Chain Verification**: Immutable verification records
+- 🛠️ **Easy Integration**: Simple TypeScript/JavaScript API
+- 🔧 **Customizable**: Pluggable check contracts for different validation logic
 
-## 🎯 What is Veritas Neat?
-
-Veritas Neat is a **verification layer** that provides cryptographic proof of API calls.
-
-### ✅ Core Features
-
-- ✅ **Cryptographic Proof** - Using Primus zktls-core-sdk
-- ✅ **On-Chain Verification** - Immutable validation records
-- ✅ **Binary Result** - Only `passed` (true/false)
-- ✅ **Simple & Minimal** - No unnecessary complexity
-
-### ❌ What It Does NOT Do
-
-- ❌ Job management
-- ❌ Payment escrow
-- ❌ Score calculation
-- ❌ Business logic
-
-These are handled by ACP or other commercial layers.
-
----
-
-## 📦 Installation
+## Installation
 
 ```bash
-npm install @veritas/neat
+npm install @primuslabs/zktls-core-sdk ethers
 ```
 
----
+## Quick Start
 
-## 🚀 Quick Start
+### 1. Deploy Contracts
 
-### 1. Setup SDK
+```bash
+npx hardhat run scripts/deploy.js --network baseSepolia
+```
+
+This will deploy:
+- RuleRegistry
+- VeritasValidator
+- HTTPCheck
+- JSONPathCheck
+
+### 2. Create Rules
+
+```bash
+npx hardhat run scripts/create-rules.js --network baseSepolia
+```
+
+### 3. Run Tests
+
+```bash
+# Set environment variables
+export PRIMUS_APP_ID="your_app_id"
+export PRIMUS_APP_SECRET="your_app_secret"
+export VALIDATOR_ADDRESS="deployed_validator_address"
+
+# Run integration test
+npx hardhat run test/run-integration-test.ts --network baseSepolia
+```
+
+## SDK Usage
+
+### Initialize
 
 ```typescript
-import { NeatVeritasSDK } from '@veritas/neat';
+import { NeatVeritasSDK } from './src/sdk';
+import { ethers } from 'ethers';
 
-const neat = new NeatVeritasSDK({
+const sdk = new NeatVeritasSDK({
   signer: wallet,
-  primusConfig: {
-    appId: 'your-primus-app-id',
-    appSecret: 'your-primus-app-secret'
-  }
+  validatorAddress: '0x...',
+  appId: '0x...',
+  appSecret: '0x...'
 });
 
-await neat.init();
+await sdk.init();
 ```
 
-### 2. Generate Attestation
+### Generate Attestation
 
 ```typescript
-const result = await neat.attest({
-  url: 'https://api.example.com/data',
-  method: 'GET'
-}, [{
-  keyName: 'data',
-  parseType: 'JSON',
-  parsePath: '$.data'
-}]);
-
-console.log(result.attestation);  // Cryptographic proof
-console.log(result.responseData); // API response
-```
-
-### 3. Validate On-Chain
-
-```typescript
-const validation = await neat.validateAttestation(
-  validatorAddress,
-  result.attestation,
-  ruleId
+const result = await sdk.attest(
+  {
+    url: 'https://api.example.com/data',
+    method: 'GET',
+  },
+  [
+    {
+      keyName: 'value',
+      parseType: 'string',
+      parsePath: '$.data.value',
+    },
+  ]
 );
 
-console.log(validation.passed); // true or false
+console.log('Verified:', result.verified);
+console.log('Data:', result.responseData);
 ```
 
----
-
-## 🏗️ Architecture
-
-```
-┌─────────────────────────────────────────┐
-│      Commercial Layer (ACP/Other)       │
-│   Jobs, Payments, Business Logic        │
-└────────────┬────────────────────────────┘
-             │ Calls Veritas for verification
-┌────────────▼────────────────────────────┐
-│      Veritas Neat Verification Layer    │
-│                                          │
-│  Input:  Attestation + Rule ID          │
-│  Output: passed (true/false)            │
-│                                          │
-│  ┌──────────────┐  ┌──────────────┐    │
-│  │RuleRegistry  │  │HTTPCheck     │    │
-│  └──────┬───────┘  └──────┬───────┘    │
-│         └─────────────────┤            │
-│              VeritasValidator           │
-└──────────────────────────┼──────────────┘
-                           │
-              ┌────────────▼────────────┐
-              │  Primus zktls-core-sdk  │
-              │  Cryptographic Proof    │
-              └─────────────────────────┘
-```
-
----
-
-## 🔐 Security Features
-
-### 1. Recipient Verification
-
-Only attestation owner can submit:
-
-```solidity
-require(attestation.recipient == msg.sender, "Not your attestation");
-```
-
-### 2. ParsePath Validation
-
-Validates data extraction paths:
+### Validate On-Chain
 
 ```typescript
-responseResolve: [{
-  keyName: 'price',
-  parseType: 'JSON',
-  parsePath: '$.data.price'  // Must exist in data
-}]
+const validation = await sdk.validate(result.attestation, ruleId);
+
+console.log('Passed:', validation.passed);
+console.log('Transaction:', validation.transactionHash);
 ```
 
-### 3. Data Integrity
+## Architecture
 
-All data comes from attestation (no external parameters).
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    VeritasValidator                              │
+│                    (Generic Validator)                           │
+├─────────────────────────────────────────────────────────────────┤
+│  1. Recipient Check                                              │
+│  2. Timestamp Verification (maxAge)                              │
+│  3. Primus ZKTLS Signature Verification                          │
+│  4. External Check Contract                                      │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     ICustomCheck                                  │
+│  validate(request, responseResolves, data, checkData)            │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+              ┌───────────────┼───────────────┐
+              ▼               ▼               ▼
+       ┌────────────┐   ┌────────────┐   ┌────────────┐
+       │ HTTPCheck  │   │JSONPathCk  │   │ Custom     │
+       └────────────┘   └────────────┘   └────────────┘
+```
 
----
-
-## 📋 Smart Contracts
+## Contracts
 
 | Contract | Description |
 |----------|-------------|
-| **RuleRegistry** | Manages validation rules |
-| **VeritasValidator** | Validates attestations |
-| **HTTPCheck** | HTTP API verification |
+| `RuleRegistry` | Stores validation rules |
+| `VeritasValidator` | Main validation contract |
+| `HTTPCheck` | Basic HTTP validation |
+| `JSONPathCheck` | Advanced JSON path validation |
 
----
+## Deployed Addresses (Base Sepolia)
 
-## 🎯 Validation Flow
+| Contract | Address |
+|----------|---------|
+| RuleRegistry | `0xA03F539830fD53A7E1345b2BC815f3A66e19bC35` |
+| VeritasValidator | `0xca215CAaDa2d446481466b3D55eb152426065f9A` |
+| HTTPCheck | `0xD3a3fA724C2436792a647528fb32fd38b7E94083` |
+| JSONPathCheck | `0x2E68F81b23cA61DFC251205283B7217654D73859` |
 
-```
-1. Generate Attestation (Agent)
-   ↓
-2. Submit to VeritasValidator (Agent)
-   ↓
-3. Verify Recipient (Validator)
-   ↓
-4. Primus Verification (On-chain)
-   ↓
-5. Custom Check Logic (HTTPCheck)
-   ↓
-6. Return passed (true/false)
-```
-
----
-
-## 💡 Usage Examples
-
-### Trading API Verification
-
-```typescript
-// Create rule for trading API
-await ruleRegistry.createRule(
-  'Trading API - Orders',
-  'Verify order creation',
-  httpCheckAddress,
-  encodeCheckData({
-    expectedUrl: 'https://api.trading.com/orders',
-    expectedMethod: 'POST',
-    minResponseCode: 200,
-    maxResponseCode: 201,
-    validateParsePath: true
-  })
-);
-
-// Agent generates attestation
-const attestation = await neat.attest({
-  url: 'https://api.trading.com/orders',
-  method: 'POST',
-  body: { symbol: 'ETH', amount: 100 }
-}, [{
-  keyName: 'orderId',
-  parseType: 'JSON',
-  parsePath: '$.data.orderId'
-}]);
-
-// Validate
-const result = await neat.validateAttestation(
-  validatorAddress,
-  attestation,
-  ruleId
-);
-
-if (result.passed) {
-  // Verified! Safe to proceed with business logic
-}
-```
-
----
-
-## 🔗 Integration with ACP
-
-Veritas Neat is designed to work with Agent Commerce Protocol:
-
-```solidity
-contract AgentCommerceProtocol {
-    VeritasValidator public validator;
-    
-    function processJob(
-        uint256 jobId,
-        Attestation calldata attestation,
-        uint256 ruleId
-    ) external {
-        // Verify attestation
-        (bool passed, ) = validator.validate(attestation, ruleId);
-        
-        if (passed) {
-            // Verification successful
-            // Safe to release payment
-            releasePayment(jobId);
-        }
-    }
-}
-```
-
----
-
-## 📖 Documentation
-
-- [Validation Details](./docs/VALIDATION_DETAILS.md)
-- [Security: Recipient Check](./docs/SECURITY_RECIPIENT_CHECK.md)
-- [Security: Attestation Data](./docs/SECURITY_ATTESTATION_DATA.md)
-- [Primus Integration](./docs/PRIMUS_INTEGRATION.md)
-- [Rules Guide](./docs/RULES_GUIDE.md)
-
----
-
-## 🛠️ Development
-
-### Compile Contracts
-
-```bash
-npm install
-npm run compile
-```
-
-### Run Tests
-
-```bash
-npm test
-```
-
-### Deploy
-
-```bash
-# Local
-npm run deploy
-
-# Base Sepolia
-npx hardhat run scripts/deploy.ts --network baseSepolia
-```
-
----
-
-## 📄 License
+## License
 
 MIT
-
----
-
-## 🙏 Acknowledgments
-
-- [Primus Labs](https://primuslabs.xyz) - zktls-core-sdk
-- [OpenZeppelin](https://openzeppelin.com) - Secure contracts
-- [Virtuals Protocol](https://virtuals.io) - ACP inspiration
-
----
-
-**Veritas Neat = Simple Verification** 🎯
